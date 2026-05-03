@@ -148,7 +148,10 @@ async function update(id, updates) {
 }
 
 async function remove(id) {
-  const [result] = await pool.execute('DELETE FROM catalogs WHERE id = ?', [id]);
+  const [result] = await pool.execute(
+    'UPDATE catalogs SET is_active = 0, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+    [id]
+  );
   return result.affectedRows > 0;
 }
 

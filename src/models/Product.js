@@ -19,6 +19,7 @@ function mapProduct(row) {
     description: row.description,
     image: row.image,
     type: row.type || 'GENERAL',
+    isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -75,6 +76,11 @@ async function listAll(filters = {}) {
     values.push(filters.type);
   }
 
+  if (filters.isActive !== undefined) {
+    whereClauses.push('p.is_active = ?');
+    values.push(filters.isActive ? 1 : 0);
+  }
+
   if (filters.tagIds && filters.tagIds.length) {
     const placeholders = filters.tagIds.map(() => '?').join(', ');
     whereClauses.push(
@@ -116,7 +122,7 @@ async function listAll(filters = {}) {
   );
   const [rows] = await pool.execute(
     `
-      SELECT p.id, p.name, p.price, p.has_vat, p.vat_rate, p.stock, p.description, p.image, p.type, p.created_at, p.updated_at
+      SELECT p.id, p.name, p.price, p.has_vat, p.vat_rate, p.stock, p.description, p.image, p.type, p.is_active, p.created_at, p.updated_at
       FROM products p
       ${whereSql}
       ORDER BY ${orderByColumn} ${orderByDirection}, p.id DESC
@@ -142,7 +148,7 @@ async function findById(id, connection) {
   const executor = getExecutor(connection);
   const [rows] = await executor.execute(
     `
-      SELECT id, name, price, has_vat, vat_rate, stock, description, image, type, created_at, updated_at
+      SELECT id, name, price, has_vat, vat_rate, stock, description, image, type, is_active, created_at, updated_at
       FROM products
       WHERE id = ?
       LIMIT 1
@@ -162,9 +168,10 @@ async function findBySlug(slug, connection) {
   const searchPattern = `%${slug.split('-').join('%')}%`;
   const [rows] = await executor.execute(
     `
-      SELECT id, name, price, has_vat, vat_rate, stock, description, image, type, created_at, updated_at
+      SELECT id, name, price, has_vat, vat_rate, stock, description, image, type, is_active, created_at, updated_at
       FROM products
       WHERE LOWER(name) LIKE ?
+        AND is_active = 1
       LIMIT 20
     `,
     [searchPattern]
@@ -184,7 +191,7 @@ async function findByIds(ids, connection, options = {}) {
   const forUpdate = options.forUpdate ? ' FOR UPDATE' : '';
   const [rows] = await executor.execute(
     `
-      SELECT id, name, price, has_vat, vat_rate, stock, description, image, type, created_at, updated_at
+      SELECT id, name, price, has_vat, vat_rate, stock, description, image, type, is_active, created_at, updated_at
       FROM products
       WHERE id IN (${placeholders})
       ORDER BY id ASC${forUpdate}
@@ -258,10 +265,14 @@ async function update(id, updates, connection) {
   }
 
     if (updates.type !== undefined) {
-      fields.push('type = ?');
-      values.push(updates.type);
-    }
+    fields.push('type = ?');
+    values.push(updates.type);
+  }
 
+  if (updates.isActive !== undefined) {
+    fields.push('is_active = ?');
+    values.push(updates.isActive ? 1 : 0);
+  }
 
   values.push(id);
 
@@ -280,7 +291,10 @@ async function update(id, updates, connection) {
 
 async function remove(id, connection) {
   const executor = getExecutor(connection);
-  const [result] = await executor.execute('DELETE FROM products WHERE id = ?', [id]);
+  const [result] = await executor.execute(
+    'UPDATE products SET is_active = 0, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+    [id]
+  );
   return result.affectedRows > 0;
 }
 

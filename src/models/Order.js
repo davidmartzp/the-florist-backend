@@ -27,6 +27,7 @@ function mapOrder(row) {
     taxTotal: Number(row.tax_total),
     total: Number(row.total),
     status: row.status,
+    isActive: Boolean(row.is_active),
     paymentProvider: row.payment_provider,
     paymentReference: row.payment_reference,
     createdAt: row.created_at,
@@ -79,6 +80,13 @@ async function listAll(filters = {}) {
     values.push(filters.shippingMethodId);
   }
 
+  if (filters.isActive !== undefined) {
+    whereClauses.push('o.is_active = ?');
+    values.push(filters.isActive ? 1 : 0);
+  } else {
+    whereClauses.push('o.is_active = 1');
+  }
+
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
   const orderByColumn = sortColumns[filters.sortBy] || 'o.created_at';
   const orderByDirection = filters.sortOrder === 'asc' ? 'ASC' : 'DESC';
@@ -99,7 +107,7 @@ async function listAll(filters = {}) {
       SELECT o.id, o.code, o.user_id, o.shipping_method_id, o.shipping_name, o.shipping_price,
              o.includes_shipping_price, o.customer_name, o.customer_email, o.customer_phone,
              o.shipping_address, o.includes_card, o.card_message,
-             o.subtotal, o.tax_total, o.total, o.status,
+             o.subtotal, o.tax_total, o.total, o.status, o.is_active,
              o.payment_provider, o.payment_reference,
              o.created_at, o.updated_at
       FROM orders o
@@ -124,7 +132,7 @@ async function findById(id, connection, options = {}) {
       SELECT id, code, user_id, shipping_method_id, shipping_name, shipping_price,
              includes_shipping_price, customer_name, customer_email, customer_phone,
              shipping_address, includes_card, card_message,
-             subtotal, tax_total, total, status,
+             subtotal, tax_total, total, status, is_active,
              payment_provider, payment_reference,
              created_at, updated_at
       FROM orders
@@ -312,7 +320,10 @@ async function update(id, updates, connection) {
 
 async function remove(id, connection) {
   const executor = getExecutor(connection);
-  const [result] = await executor.execute('DELETE FROM orders WHERE id = ?', [id]);
+  const [result] = await executor.execute(
+    'UPDATE orders SET is_active = 0, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+    [id]
+  );
   return result.affectedRows > 0;
 }
 

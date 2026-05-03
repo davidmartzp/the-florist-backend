@@ -120,17 +120,7 @@ async function updateCatalog(catalogId, payload) {
 
 async function deleteCatalog(catalogId) {
   await ensureCatalogExists(catalogId);
-
-  try {
-    await Catalog.remove(catalogId);
-  } catch (error) {
-    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      throw new HttpError(409, 'Cannot delete a catalog assigned to products');
-    }
-
-    throw error;
-  }
-
+  await Catalog.remove(catalogId);
   return { message: 'Catalog deleted successfully' };
 }
 

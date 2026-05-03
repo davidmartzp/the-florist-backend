@@ -10,6 +10,7 @@ function mapCategory(row) {
     name: row.name,
     slug: row.slug,
     description: row.description,
+    isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -27,11 +28,13 @@ async function listAll(options = {}) {
   const limit = Number.isInteger(options.pageSize) && options.pageSize > 0 ? options.pageSize : 20;
   const offset = Number.isInteger(options.offset) && options.offset >= 0 ? options.offset : 0;
 
-  const [countRows] = await pool.execute('SELECT COUNT(*) AS total FROM categories');
+  const whereClause = options.isActive !== undefined ? `WHERE is_active = ${options.isActive ? 1 : 0}` : '';
+  const [countRows] = await pool.execute(`SELECT COUNT(*) AS total FROM categories ${whereClause}`);
   const [rows] = await pool.execute(
     `
-      SELECT id, name, slug, description, created_at, updated_at
+      SELECT id, name, slug, description, is_active, created_at, updated_at
       FROM categories
+      ${whereClause}
       ORDER BY ${orderByColumn} ${orderByDirection}, id DESC
       LIMIT ${limit} OFFSET ${offset}
     `
@@ -62,15 +65,19 @@ async function listWithStock(options = {}) {
       JOIN product_categories pc ON pc.category_id = c.id
       JOIN products p ON p.id = pc.product_id
       WHERE p.stock > 0
+        AND c.is_active = 1
+        AND p.is_active = 1
     `
   );
   const [rows] = await pool.execute(
     `
-      SELECT DISTINCT c.id, c.name, c.slug, c.description, c.created_at, c.updated_at
+      SELECT DISTINCT c.id, c.name, c.slug, c.description, c.is_active, c.created_at, c.updated_at
       FROM categories c
       JOIN product_categories pc ON pc.category_id = c.id
       JOIN products p ON p.id = pc.product_id
       WHERE p.stock > 0
+        AND c.is_active = 1
+        AND p.is_active = 1
       ORDER BY ${orderByColumn} ${orderByDirection}, c.id DESC
       LIMIT ${limit} OFFSET ${offset}
     `
@@ -85,7 +92,7 @@ async function listWithStock(options = {}) {
 async function findById(id) {
   const [rows] = await pool.execute(
     `
-      SELECT id, name, slug, description, created_at, updated_at
+      SELECT id, name, slug, description, is_active, created_at, updated_at
       FROM categories
       WHERE id = ?
       LIMIT 1
@@ -99,9 +106,10 @@ async function findById(id) {
 async function findBySlug(slug) {
   const [rows] = await pool.execute(
     `
-      SELECT id, name, slug, description, created_at, updated_at
+      SELECT id, name, slug, description, is_active, created_at, updated_at
       FROM categories
       WHERE slug = ?
+        AND is_active = 1
       LIMIT 1
     `,
     [slug]
@@ -118,7 +126,7 @@ async function listByIds(ids) {
   const placeholders = ids.map(() => '?').join(', ');
   const [rows] = await pool.execute(
     `
-      SELECT id, name, slug, description, created_at, updated_at
+      SELECT id, name, slug, description, is_active, created_at, updated_at
       FROM categories
       WHERE id IN (${placeholders})
       ORDER BY name ASC
@@ -129,13 +137,13 @@ async function listByIds(ids) {
   return rows.map(mapCategory);
 }
 
-async function create({ name, slug, description }) {
+async function create({ name, slug, description, isActive = true }) {
   const [result] = await pool.execute(
     `
-      INSERT INTO categories (name, slug, description)
-      VALUES (?, ?, ?)
+      INSERT INTO categories (name, slug, description, is_active)
+      VALUES (?, ?, ?, ?)
     `,
-    [name, slug, description]
+    [name, slug, description, isActive ? 1 : 0]
   );
 
   return findById(result.insertId);
@@ -160,6 +168,11 @@ async function update(id, updates) {
     values.push(updates.description);
   }
 
+  if (updates.isActive !== undefined) {
+    fields.push('is_active = ?');
+    values.push(updates.isActive ? 1 : 0);
+  }
+
   if (!fields.length) {
     return findById(id);
   }
@@ -180,7 +193,10 @@ async function update(id, updates) {
 }
 
 async function remove(id) {
-  const [result] = await pool.execute('DELETE FROM categories WHERE id = ?', [id]);
+  const [result] = await pool.execute(
+    'UPDATE categories SET is_active = 0, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+    [id]
+  );
   return result.affectedRows > 0;
 }
 

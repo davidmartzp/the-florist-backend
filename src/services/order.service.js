@@ -690,7 +690,6 @@ async function deleteOrder(orderId) {
     }
 
     await persistStocks(stockByProductId, connection);
-    await Order.replaceItems(normalizedOrderId, [], connection);
     await Order.remove(normalizedOrderId, connection);
     await connection.commit();
   } catch (error) {

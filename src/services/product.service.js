@@ -482,27 +482,7 @@ async function updateProduct(productId, payload) {
 
 async function deleteProduct(productId) {
   await ensureProductExists(productId);
-  const connection = await pool.getConnection();
-
-  try {
-    await connection.beginTransaction();
-    await Product.replaceCategories(productId, [], connection);
-    await Product.replaceTags(productId, [], connection);
-    await Product.replaceCatalogs(productId, [], connection);
-    await Product.remove(productId, connection);
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-
-    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      throw new HttpError(409, 'Cannot delete a product already referenced by orders');
-    }
-
-    throw error;
-  } finally {
-    connection.release();
-  }
-
+  await Product.remove(productId);
   return { message: 'Product deleted successfully' };
 }
 

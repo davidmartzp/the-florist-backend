@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS products (
   description TEXT NULL,
   image VARCHAR(500) NULL,
   type VARCHAR(20) NOT NULL DEFAULT 'GENERAL',
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS categories (
   name VARCHAR(150) NOT NULL,
   slug VARCHAR(180) NOT NULL,
   description TEXT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -157,6 +159,7 @@ CREATE TABLE IF NOT EXISTS orders (
   tax_total DECIMAL(10, 2) NOT NULL DEFAULT 0,
   total DECIMAL(10, 2) NOT NULL DEFAULT 0,
   status VARCHAR(50) NOT NULL DEFAULT 'pending',
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
   payment_provider VARCHAR(100) NULL,
   payment_reference VARCHAR(255) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -642,5 +645,50 @@ SET @orders_payment_reference_sql := IF(
   'SELECT 1'
 );
 PREPARE stmt FROM @orders_payment_reference_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @products_is_active_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'products'
+    AND COLUMN_NAME = 'is_active'
+);
+SET @products_is_active_sql := IF(
+  @products_is_active_exists = 0,
+  'ALTER TABLE products ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER type',
+  'SELECT 1'
+);
+PREPARE stmt FROM @products_is_active_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @categories_is_active_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'categories'
+    AND COLUMN_NAME = 'is_active'
+);
+SET @categories_is_active_sql := IF(
+  @categories_is_active_exists = 0,
+  'ALTER TABLE categories ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER description',
+  'SELECT 1'
+);
+PREPARE stmt FROM @categories_is_active_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @orders_is_active_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'is_active'
+);
+SET @orders_is_active_sql := IF(
+  @orders_is_active_exists = 0,
+  'ALTER TABLE orders ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER status',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_is_active_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

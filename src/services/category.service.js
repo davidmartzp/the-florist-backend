@@ -102,17 +102,7 @@ async function updateCategory(categoryId, payload) {
 
 async function deleteCategory(categoryId) {
   await ensureCategoryExists(categoryId);
-
-  try {
-    await Category.remove(categoryId);
-  } catch (error) {
-    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      throw new HttpError(409, 'Cannot delete a category assigned to products');
-    }
-
-    throw error;
-  }
-
+  await Category.remove(categoryId);
   return { message: 'Category deleted successfully' };
 }
 
