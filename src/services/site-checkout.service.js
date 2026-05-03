@@ -1,0 +1,384 @@
+const { pool } = require('../config/db');
+const CheckoutSession = require('../models/CheckoutSession');
+const OrderService = require('./order.service');
+const ShippingMethod = require('../models/ShippingMethod');
+const HttpError = require('../utils/http-error');
+
+function normalizeString(value, fieldName, options = {}) {
+  if (value === undefined) {
+    return options.defaultValue;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  const normalizedValue = String(value).trim();
+
+  if (!normalizedValue) {
+    if (options.required) {
+      throw new HttpError(400, `${fieldName} is required`);
+    }
+    return null;
+  }
+
+  if (options.maxLength && normalizedValue.length > options.maxLength) {
+    throw new HttpError(400, `${fieldName} must contain at most ${options.maxLength} characters`);
+  }
+
+  return normalizedValue;
+}
+
+function normalizeEmail(value, fieldName, options = {}) {
+  const normalizedValue = normalizeString(value, fieldName, options);
+
+  if (normalizedValue === undefined || normalizedValue === null) {
+    return normalizedValue;
+  }
+
+  const lowercased = normalizedValue.toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lowercased)) {
+    throw new HttpError(400, `${fieldName} must be a valid email`);
+  }
+
+  return lowercased;
+}
+
+function normalizePositiveInteger(value, fieldName) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalizedValue = Number(value);
+
+  if (!Number.isInteger(normalizedValue) || normalizedValue <= 0) {
+    throw new HttpError(400, `${fieldName} must be a positive integer`);
+  }
+
+  return normalizedValue;
+}
+
+function normalizeCartItems(cart) {
+  if (!Array.isArray(cart) || !cart.length) {
+    throw new HttpError(400, 'cart must be a non-empty array');
+  }
+
+  return cart.map((item, index) => {
+    if (!item || typeof item !== 'object') {
+      throw new HttpError(400, `cart[${index}] must be an object`);
+    }
+
+    const productId = Number(item.productId);
+    const quantity = Number(item.quantity);
+    const unitPrice = Number(item.unitPrice);
+    const name = item.name ? String(item.name).trim() : null;
+
+    if (!Number.isInteger(productId) || productId <= 0) {
+      throw new HttpError(400, `cart[${index}].productId must be a positive integer`);
+    }
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new HttpError(400, `cart[${index}].quantity must be a positive integer`);
+    }
+
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      throw new HttpError(400, `cart[${index}].unitPrice must be a number greater than or equal to 0`);
+    }
+
+    return {
+      productId,
+      quantity,
+      unitPrice,
+      name: name || `Product ${productId}`,
+    };
+  });
+}
+
+function normalizeReturnUrl(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalizedValue = String(value).trim();
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  return normalizedValue;
+}
+
+async function createCheckoutSession(payload) {
+  const session = await CheckoutSession.create(payload);
+  return session;
+}
+
+async function createCheckoutPreference(payload) {
+  const normalizedCart = normalizeCartItems(payload.cart);
+  const customerName = normalizeString(payload.customerName, 'customerName', { required: true, maxLength: 150 });
+  const customerPhone = normalizeString(payload.customerPhone, 'customerPhone', { required: true, maxLength: 50 });
+  const customerEmail = normalizeEmail(payload.customerEmail, 'customerEmail', { required: true, maxLength: 150 });
+  const shippingAddress = normalizeString(payload.deliveryAddress, 'deliveryAddress', { maxLength: 255 });
+  const cardMessage = normalizeString(payload.cardMessage, 'cardMessage', { maxLength: 500 });
+  const shippingMethodId = payload.shippingMethodId === null || payload.shippingMethodId === undefined || payload.shippingMethodId === ''
+    ? null
+    : normalizePositiveInteger(payload.shippingMethodId, 'shippingMethodId');
+  const returnUrl = normalizeReturnUrl(payload.returnUrl) || `${process.env.APP_URL || 'http://localhost:3000'}/checkout`;
+
+  let shippingMethod = null;
+  let shippingItem = null;
+
+  if (shippingMethodId) {
+    shippingMethod = await ShippingMethod.findById(shippingMethodId);
+
+    if (!shippingMethod) {
+      throw new HttpError(400, `Unknown shippingMethodId: ${shippingMethodId}`);
+    }
+
+    if (shippingMethod.price !== null && shippingMethod.price > 0) {
+      shippingItem = {
+        title: `Envío - ${shippingMethod.name}`,
+        quantity: 1,
+        unit_price: shippingMethod.price,
+      };
+    }
+  }
+
+  if (!process.env.MERCADOPAGO_ACCESS_TOKEN) {
+    throw new HttpError(501, 'MERCADOPAGO_ACCESS_TOKEN not configured on server');
+  }
+
+  const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+  const mpClient = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
+  const preferenceApi = new Preference(mpClient);
+  const paymentApi = new Payment(mpClient);
+
+  const preferenceItems = normalizedCart.map((entry) => ({
+    title: entry.name,
+    quantity: entry.quantity,
+    unit_price: entry.unitPrice,
+  }));
+
+  if (shippingItem) {
+    preferenceItems.push(shippingItem);
+  }
+
+  const callbackUrl = `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}paymentSuccess=1`;
+
+  const isPublicUrl = /^https?:\/\/(?!localhost|127\.0\.0\.1)/.test(callbackUrl);
+
+  const notificationUrl = process.env.APP_URL
+    ? `${process.env.APP_URL}/api/site/checkout/webhook`
+    : null;
+
+  const preference = {
+    items: preferenceItems,
+    payer: {
+      name: customerName,
+      email: customerEmail,
+      phone: {
+        number: customerPhone,
+      },
+    },
+    back_urls: {
+      success: callbackUrl,
+      failure: callbackUrl,
+      pending: callbackUrl,
+    },
+    ...(isPublicUrl ? { auto_return: 'approved' } : {}),
+    ...(notificationUrl ? { notification_url: notificationUrl } : {}),
+  };
+
+  const response = await preferenceApi.create({ body: preference });
+  const preferenceId = response.id || response.preference_id || null;
+
+  if (!preferenceId) {
+    throw new HttpError(500, 'Could not create MercadoPago preference');
+  }
+
+  await createCheckoutSession({
+    preferenceId,
+    payload: {
+      cart: normalizedCart,
+      customerName,
+      customerPhone,
+      customerEmail,
+      deliveryAddress: shippingAddress,
+      cardMessage,
+      shippingMethodId,
+    },
+    status: 'created',
+  });
+
+  const isLocalhost = /localhost|127\.0\.0\.1/.test(returnUrl);
+  const checkoutUrl = (isLocalhost && response.sandbox_init_point)
+    ? response.sandbox_init_point
+    : response.init_point;
+
+  return {
+    init_point: checkoutUrl,
+    sandbox_init_point: response.sandbox_init_point,
+    preferenceId,
+  };
+}
+
+async function confirmCheckoutPayment(payload) {
+  const preferenceId = normalizeString(payload.preferenceId, 'preferenceId', { required: true });
+  const collectionId = normalizeString(payload.collectionId, 'collectionId', { required: true });
+  const collectionStatus = normalizeString(payload.collectionStatus || payload.status, 'collectionStatus', { required: true });
+
+  if (collectionStatus.toLowerCase() !== 'approved') {
+    throw new HttpError(400, 'Payment is not approved');
+  }
+
+  // Verificar el pago real con la API de MercadoPago ANTES del lock
+  if (!process.env.MERCADOPAGO_ACCESS_TOKEN) {
+    throw new HttpError(501, 'MERCADOPAGO_ACCESS_TOKEN not configured on server');
+  }
+
+  const { MercadoPagoConfig, Payment } = require('mercadopago');
+  const mpClient = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
+  const paymentApi = new Payment(mpClient);
+
+  let payment;
+  try {
+    payment = await paymentApi.get({ id: collectionId });
+  } catch (mpError) {
+    throw new HttpError(502, `MercadoPago verification failed: ${mpError.message || 'Unknown error'}`);
+  }
+
+  if (!payment || payment.status !== 'approved') {
+    throw new HttpError(400, 'Payment verification failed: payment is not approved');
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const session = await CheckoutSession.findByPreferenceIdForUpdate(preferenceId, connection);
+
+    if (!session) {
+      throw new HttpError(404, 'Checkout session not found');
+    }
+
+    if (session.orderId) {
+      await connection.commit();
+      return { alreadyConfirmed: true, orderId: session.orderId };
+    }
+
+    const orderPayload = {
+      items: session.payload.cart,
+      customerName: session.payload.customerName,
+      customerEmail: session.payload.customerEmail,
+      customerPhone: session.payload.customerPhone,
+      shippingAddress: session.payload.deliveryAddress,
+      includesCard: !!session.payload.cardMessage,
+      cardMessage: session.payload.cardMessage,
+      shippingMethodId: session.payload.shippingMethodId,
+      paymentReference: collectionId,
+      status: 'pending',
+    };
+
+    const order = await OrderService.createOrder(null, orderPayload);
+
+    await CheckoutSession.update(session.id, {
+      status: 'confirmed',
+      paymentReference: collectionId,
+      orderId: order.id,
+      orderCode: order.code,
+    }, connection);
+
+    await connection.commit();
+    return order;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function processWebhook(payload) {
+  const dataId = payload.data?.id;
+  const type = payload.type || payload.action;
+
+  if (type !== 'payment' || !dataId) {
+    return { processed: false, reason: 'Not a payment notification' };
+  }
+
+  if (!process.env.MERCADOPAGO_ACCESS_TOKEN) {
+    throw new HttpError(501, 'MERCADOPAGO_ACCESS_TOKEN not configured on server');
+  }
+
+  const { MercadoPagoConfig, Payment } = require('mercadopago');
+  const mpClient = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
+  const paymentApi = new Payment(mpClient);
+
+  let payment;
+  try {
+    payment = await paymentApi.get({ id: dataId });
+  } catch (mpError) {
+    throw new HttpError(502, `MercadoPago verification failed: ${mpError.message || 'Unknown error'}`);
+  }
+
+  if (!payment || payment.status !== 'approved') {
+    return { processed: false, reason: `Payment status: ${payment?.status || 'unknown'}` };
+  }
+
+  const preferenceId = payment.preference_id || payment.metadata?.preference_id;
+  if (!preferenceId) {
+    return { processed: false, reason: 'No preference_id found in payment' };
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const session = await CheckoutSession.findByPreferenceIdForUpdate(preferenceId, connection);
+
+    if (!session) {
+      await connection.commit();
+      return { processed: false, reason: 'Checkout session not found' };
+    }
+
+    if (session.orderId) {
+      await connection.commit();
+      return { processed: true, alreadyConfirmed: true, orderId: session.orderId };
+    }
+
+    const orderPayload = {
+      items: session.payload.cart,
+      customerName: session.payload.customerName,
+      customerEmail: session.payload.customerEmail,
+      customerPhone: session.payload.customerPhone,
+      shippingAddress: session.payload.deliveryAddress,
+      includesCard: !!session.payload.cardMessage,
+      cardMessage: session.payload.cardMessage,
+      shippingMethodId: session.payload.shippingMethodId,
+      paymentReference: String(dataId),
+      status: 'pending',
+    };
+
+    const order = await OrderService.createOrder(null, orderPayload);
+
+    await CheckoutSession.update(session.id, {
+      status: 'confirmed',
+      paymentReference: String(dataId),
+      orderId: order.id,
+      orderCode: order.code,
+    }, connection);
+
+    await connection.commit();
+    return { processed: true, orderId: order.id };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+module.exports = {
+  createCheckoutPreference,
+  confirmCheckoutPayment,
+  processWebhook,
+};
