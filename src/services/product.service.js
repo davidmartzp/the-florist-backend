@@ -306,6 +306,7 @@ async function listProductsWithFilters(query = {}) {
     categoryIds: normalizeFilterIdList(query.categoryIds, 'categoryIds'),
     tagIds: normalizeFilterIdList(query.tagIds, 'tagIds'),
     catalogIds: normalizeFilterIdList(query.catalogIds, 'catalogIds'),
+    isActive: query.isActive !== undefined ? query.isActive !== 'false' && query.isActive !== false && query.isActive !== 0 : undefined,
     ...pagination,
   };
 

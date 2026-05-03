@@ -40,6 +40,7 @@ async function listSiteProducts(req, res) {
     const query = {
       ...req.query,
       type: 'GENERAL',
+      isActive: true,
     };
 
     const response = await productService.listProductsWithFilters(query);
@@ -55,7 +56,7 @@ async function getSiteProduct(req, res) {
   try {
     const product = await productService.getProductById(req.params.productId);
 
-    if (product.type === 'COMPLEMENT') {
+    if (!product.isActive || product.type === 'COMPLEMENT') {
       return res.status(404).json({ error: 'Product not found' });
     }
 
