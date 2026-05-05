@@ -407,6 +407,8 @@ async function processWebhook(payload, headers = {}) {
   }
 
   // eslint-disable-next-line no-console
+  console.log('[Webhook] Pago completo MP: %j', payment);
+  // eslint-disable-next-line no-console
   console.log('[Webhook] Pago obtenido | id=%s | status=%s | monto=%s %s | fecha=%s | payer=%s',
     payment.id,
     payment.status,
