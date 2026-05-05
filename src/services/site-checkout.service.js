@@ -391,6 +391,12 @@ async function processWebhook(payload, headers = {}) {
       payment = await paymentApi.get({ id: Number(dataId) });
       break;
     } catch (mpError) {
+      const is404 = mpError?.status === 404 || mpError?.cause?.[0]?.code === 2000;
+      if (is404) {
+        // eslint-disable-next-line no-console
+        console.log('[Webhook] Payment not found in MP (id=%s), skipping', dataId);
+        return { processed: false, reason: 'Payment not found' };
+      }
       if (attempts === 0) {
         // eslint-disable-next-line no-console
         console.error('[Webhook] MP get payment error:', mpError);
