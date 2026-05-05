@@ -337,10 +337,14 @@ async function confirmCheckoutPayment(payload) {
 }
 
 async function processWebhook(payload) {
-  const dataId = payload.data?.id;
-  const type = payload.type || payload.action;
+  const dataId = payload?.data?.id;
 
-  if (type !== 'payment' || !dataId) {
+  // Validación correcta del tipo de evento
+  const isPayment =
+    payload?.type === 'payment' ||
+    payload?.action?.startsWith('payment.');
+
+  if (!isPayment || !dataId) {
     return { processed: false, reason: 'Not a payment notification' };
   }
 
@@ -349,38 +353,90 @@ async function processWebhook(payload) {
   }
 
   const { MercadoPagoConfig, Payment } = require('mercadopago');
-  const mpClient = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
+
+  const mpClient = new MercadoPagoConfig({
+    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
+  });
+
   const paymentApi = new Payment(mpClient);
 
+  // 🔁 Reintentos por posible delay de MP
   let payment;
-  try {
-    payment = await paymentApi.get({ id: dataId });
-  } catch (mpError) {
-    throw new HttpError(502, `MercadoPago verification failed: ${mpError.message || 'Unknown error'}`);
+  let attempts = 3;
+
+  while (attempts--) {
+    try {
+      // Compatibilidad SDK (objeto vs id directo)
+      try {
+        payment = await paymentApi.get({ id: dataId });
+      } catch (e) {
+        payment = await paymentApi.get(dataId);
+      }
+      break;
+    } catch (mpError) {
+      if (attempts === 0) {
+        console.error('MP ERROR FULL:', mpError);
+        throw new HttpError(
+          502,
+          `MercadoPago verification failed: ${mpError.message || 'Unknown error'}`
+        );
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
   }
 
+  // Validación de estado
   if (!payment || payment.status !== 'approved') {
-    return { processed: false, reason: `Payment status: ${payment?.status || 'unknown'}` };
+    return {
+      processed: false,
+      reason: 'Payment not approved',
+      status: payment?.status,
+      id: dataId,
+    };
   }
 
-  const preferenceId = payment.preference_id || payment.metadata?.preference_id;
+  // Obtener preference_id de forma segura
+  const preferenceId =
+    payment.preference_id ||
+    payment.metadata?.preference_id ||
+    payment.additional_info?.items?.[0]?.id;
+
   if (!preferenceId) {
-    return { processed: false, reason: 'No preference_id found in payment' };
+    return {
+      processed: false,
+      reason: 'No preference_id found in payment',
+      paymentId: dataId,
+    };
   }
 
   const connection = await pool.getConnection();
+
   try {
     await connection.beginTransaction();
-    const session = await CheckoutSession.findByPreferenceIdForUpdate(preferenceId, connection);
+
+    const session =
+      await CheckoutSession.findByPreferenceIdForUpdate(
+        preferenceId,
+        connection
+      );
 
     if (!session) {
       await connection.commit();
-      return { processed: false, reason: 'Checkout session not found' };
+      return {
+        processed: false,
+        reason: 'Checkout session not found',
+        preferenceId,
+      };
     }
 
+    // Idempotencia
     if (session.orderId) {
       await connection.commit();
-      return { processed: true, alreadyConfirmed: true, orderId: session.orderId };
+      return {
+        processed: true,
+        alreadyConfirmed: true,
+        orderId: session.orderId,
+      };
     }
 
     const orderPayload = {
@@ -406,17 +462,26 @@ async function processWebhook(payload) {
 
     const order = await OrderService.createOrder(null, orderPayload);
 
-    await CheckoutSession.update(session.id, {
-      status: 'confirmed',
-      paymentReference: String(dataId),
-      orderId: order.id,
-      orderCode: order.code,
-    }, connection);
+    await CheckoutSession.update(
+      session.id,
+      {
+        status: 'confirmed',
+        paymentReference: String(dataId),
+        orderId: order.id,
+        orderCode: order.code,
+      },
+      connection
+    );
 
     await connection.commit();
-    return { processed: true, orderId: order.id };
+
+    return {
+      processed: true,
+      orderId: order.id,
+    };
   } catch (error) {
     await connection.rollback();
+    console.error('PROCESS WEBHOOK ERROR:', error);
     throw error;
   } finally {
     connection.release();
