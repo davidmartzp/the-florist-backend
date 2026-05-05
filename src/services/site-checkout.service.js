@@ -406,6 +406,16 @@ async function processWebhook(payload, headers = {}) {
     }
   }
 
+  // eslint-disable-next-line no-console
+  console.log('[Webhook] Pago obtenido | id=%s | status=%s | monto=%s %s | fecha=%s | payer=%s',
+    payment.id,
+    payment.status,
+    payment.currency_id,
+    payment.transaction_amount,
+    payment.date_approved || payment.date_created,
+    payment.payer?.email || '(sin email)'
+  );
+
   // Validación de estado
   if (!payment || payment.status !== 'approved') {
     return {
