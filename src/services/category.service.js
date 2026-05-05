@@ -100,15 +100,16 @@ async function updateCategory(categoryId, payload) {
   return Category.update(categoryId, updates);
 }
 
-async function deleteCategory(categoryId) {
-  await ensureCategoryExists(categoryId);
-  await Category.remove(categoryId);
-  return { message: 'Category deleted successfully' };
+async function toggleCategoryActive(categoryId) {
+  const category = await ensureCategoryExists(categoryId);
+  const nextActive = !category.isActive;
+  await Category.update(categoryId, { isActive: nextActive });
+  return { message: nextActive ? 'Category activated successfully' : 'Category deactivated successfully', isActive: nextActive };
 }
 
 module.exports = {
   createCategory,
-  deleteCategory,
+  toggleCategoryActive,
   getCategoryById,
   listCategories,
   updateCategory,

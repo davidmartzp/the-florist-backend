@@ -168,7 +168,10 @@ async function update(id, updates) {
 }
 
 async function remove(id) {
-  const [result] = await pool.execute('DELETE FROM shipping_methods WHERE id = ?', [id]);
+  const [result] = await pool.execute(
+    'UPDATE shipping_methods SET is_active = 0, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+    [id]
+  );
   return result.affectedRows > 0;
 }
 

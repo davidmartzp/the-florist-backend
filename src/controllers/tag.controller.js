@@ -22,9 +22,9 @@ async function updateTag(req, res) {
   }
 }
 
-async function deleteTag(req, res) {
+async function toggleTagActive(req, res) {
   try {
-    const result = await tagService.deleteTag(req.params.tagId);
+    const result = await tagService.toggleTagActive(req.params.tagId);
     res.json(result);
   } catch (error) {
     res.status(getStatusCode(error)).json({ error: error.message });
@@ -33,5 +33,5 @@ async function deleteTag(req, res) {
 
 module.exports = {
   createTag,
-  deleteTag,
+  toggleTagActive,
 };

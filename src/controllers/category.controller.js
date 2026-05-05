@@ -40,9 +40,9 @@ async function updateCategory(req, res) {
   }
 }
 
-async function deleteCategory(req, res) {
+async function toggleCategoryActive(req, res) {
   try {
-    const result = await categoryService.deleteCategory(req.params.categoryId);
+    const result = await categoryService.toggleCategoryActive(req.params.categoryId);
     res.json(result);
   } catch (error) {
     res.status(getStatusCode(error)).json({ error: error.message });
@@ -51,7 +51,7 @@ async function deleteCategory(req, res) {
 
 module.exports = {
   createCategory,
-  deleteCategory,
+  toggleCategoryActive,
   getCategory,
   listCategories,
   updateCategory,

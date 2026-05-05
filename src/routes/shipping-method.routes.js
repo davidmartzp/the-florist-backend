@@ -10,6 +10,6 @@ router.get('/', controller.listShippingMethods);
 router.get('/:shippingMethodId', controller.getShippingMethod);
 router.post('/', controller.createShippingMethod);
 router.patch('/:shippingMethodId', controller.updateShippingMethod);
-router.delete('/:shippingMethodId', controller.deleteShippingMethod);
+router.patch('/:shippingMethodId/toggle-active', controller.toggleShippingMethodActive);
 
 module.exports = router;

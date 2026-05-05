@@ -184,18 +184,18 @@ async function updateUser(userId, payload) {
   }
 }
 
-async function deactivateUser(actorUserId, targetUserId) {
+async function toggleUserActive(actorUserId, targetUserId) {
   const user = await ensureUserExists(targetUserId);
 
-  if (!user.isActive) {
-    throw new HttpError(400, 'User is already inactive');
-  }
-
   if (Number(actorUserId) === Number(targetUserId)) {
-    throw new HttpError(400, 'You cannot deactivate your own account');
+    throw new HttpError(400, 'You cannot change your own account status');
   }
 
-  await User.deactivate(targetUserId);
+  if (user.isActive) {
+    await User.deactivate(targetUserId);
+  } else {
+    await User.activate(targetUserId);
+  }
 
   return getUserById(targetUserId);
 }
@@ -206,9 +206,9 @@ async function getAccessControlCatalog() {
 
 module.exports = {
   createUser,
-  deactivateUser,
   getAccessControlCatalog,
   getUserById,
   listUsers,
+  toggleUserActive,
   updateUser,
 };

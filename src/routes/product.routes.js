@@ -11,6 +11,6 @@ router.get('/:productId/price-history', controller.listProductPriceHistory);
 router.get('/:productId', controller.getProduct);
 router.post('/', controller.createProduct);
 router.patch('/:productId', controller.updateProduct);
-router.delete('/:productId', controller.deleteProduct);
+router.patch('/:productId/toggle-active', controller.toggleProductActive);
 
 module.exports = router;

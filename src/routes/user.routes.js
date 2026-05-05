@@ -16,9 +16,9 @@ router.get('/:userId', requirePermissions('USERS'), controller.getUser);
 router.post('/', requirePermissions('USERS'), controller.createUser);
 router.patch('/:userId', requirePermissions('USERS'), controller.updateUser);
 router.patch(
-  '/:userId/deactivate',
+  '/:userId/toggle-active',
   requirePermissions('USERS'),
-  controller.deactivateUser
+  controller.toggleUserActive
 );
 
 module.exports = router;

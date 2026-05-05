@@ -7,9 +7,10 @@ router.use(auth);
 router.use(requirePermissions('ORDERS'));
 
 router.get('/', controller.listOrders);
+router.get('/export', controller.exportOrders);
 router.get('/:orderId', controller.getOrder);
 router.post('/', controller.createOrder);
 router.patch('/:orderId', controller.updateOrder);
-router.delete('/:orderId', controller.deleteOrder);
+router.patch('/:orderId/toggle-active', controller.toggleOrderActive);
 
 module.exports = router;

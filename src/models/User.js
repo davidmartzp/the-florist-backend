@@ -195,6 +195,19 @@ async function deactivate(userId) {
   );
 }
 
+async function activate(userId) {
+  await pool.execute(
+    `
+      UPDATE users
+      SET is_active = 1,
+          deactivated_at = NULL,
+          updated_at = UTC_TIMESTAMP()
+      WHERE id = ?
+    `,
+    [userId]
+  );
+}
+
 async function updatePassword(userId, passwordHash) {
   await pool.execute(
     `
@@ -210,6 +223,7 @@ async function updatePassword(userId, passwordHash) {
 }
 
 module.exports = {
+  activate,
   create,
   deactivate,
   findByEmail,

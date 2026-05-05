@@ -118,15 +118,16 @@ async function updateCatalog(catalogId, payload) {
   return Catalog.update(catalogId, updates);
 }
 
-async function deleteCatalog(catalogId) {
-  await ensureCatalogExists(catalogId);
-  await Catalog.remove(catalogId);
-  return { message: 'Catalog deleted successfully' };
+async function toggleCatalogActive(catalogId) {
+  const catalog = await ensureCatalogExists(catalogId);
+  const nextActive = !catalog.isActive;
+  await Catalog.update(catalogId, { isActive: nextActive });
+  return { message: nextActive ? 'Catalog activated successfully' : 'Catalog deactivated successfully', isActive: nextActive };
 }
 
 module.exports = {
   createCatalog,
-  deleteCatalog,
+  toggleCatalogActive,
   getCatalogById,
   listCatalogs,
   updateCatalog,

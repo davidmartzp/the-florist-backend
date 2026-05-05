@@ -481,15 +481,16 @@ async function updateProduct(productId, payload) {
   }
 }
 
-async function deleteProduct(productId) {
-  await ensureProductExists(productId);
-  await Product.remove(productId);
-  return { message: 'Product deleted successfully' };
+async function toggleProductActive(productId) {
+  const product = await ensureProductExists(productId);
+  const nextActive = !product.isActive;
+  await Product.update(productId, { isActive: nextActive });
+  return { message: nextActive ? 'Product activated successfully' : 'Product deactivated successfully', isActive: nextActive };
 }
 
 module.exports = {
   createProduct,
-  deleteProduct,
+  toggleProductActive,
   getProductById,
   getProductBySlug,
   listProducts,

@@ -40,9 +40,9 @@ async function updateShippingMethod(req, res) {
   }
 }
 
-async function deleteShippingMethod(req, res) {
+async function toggleShippingMethodActive(req, res) {
   try {
-    const result = await shippingMethodService.deleteShippingMethod(req.params.shippingMethodId);
+    const result = await shippingMethodService.toggleShippingMethodActive(req.params.shippingMethodId);
     res.json(result);
   } catch (error) {
     res.status(getStatusCode(error)).json({ error: error.message });
@@ -51,7 +51,7 @@ async function deleteShippingMethod(req, res) {
 
 module.exports = {
   createShippingMethod,
-  deleteShippingMethod,
+  toggleShippingMethodActive,
   getShippingMethod,
   listShippingMethods,
   updateShippingMethod,

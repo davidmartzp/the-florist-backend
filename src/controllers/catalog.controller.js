@@ -40,9 +40,9 @@ async function updateCatalog(req, res) {
   }
 }
 
-async function deleteCatalog(req, res) {
+async function toggleCatalogActive(req, res) {
   try {
-    const result = await catalogService.deleteCatalog(req.params.catalogId);
+    const result = await catalogService.toggleCatalogActive(req.params.catalogId);
     res.json(result);
   } catch (error) {
     res.status(getStatusCode(error)).json({ error: error.message });
@@ -51,7 +51,7 @@ async function deleteCatalog(req, res) {
 
 module.exports = {
   createCatalog,
-  deleteCatalog,
+  toggleCatalogActive,
   getCatalog,
   listCatalogs,
   updateCatalog,

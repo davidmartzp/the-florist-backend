@@ -7,6 +7,8 @@ const HttpError = require('../utils/http-error');
 const { buildPaginatedResponse, parseListQuery } = require('../utils/list-query');
 
 const ORDER_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled'];
+const BILLING_DOCUMENT_TYPES = ['CC', 'CE', 'NIT', 'PASAPORTE'];
+const PAYMENT_PROVIDERS = ['tienda', 'whatsapp', 'otros', 'mercadopago'];
 const MONTHS_ES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
 
 function roundMoney(value) {
@@ -124,6 +126,34 @@ function normalizeOptionalText(value, fieldName, options = {}) {
   }
 
   return normalizedValue;
+}
+
+function normalizePaymentProvider(value, options = {}) {
+  if (value === undefined) return options.defaultValue;
+  if (value === null || String(value).trim() === '') return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (!PAYMENT_PROVIDERS.includes(normalized)) {
+    throw new HttpError(400, `paymentProvider must be one of: ${PAYMENT_PROVIDERS.join(', ')}`);
+  }
+  return normalized;
+}
+
+function normalizeBillingDocumentType(value, options = {}) {
+  if (value === undefined) {
+    return options.defaultValue;
+  }
+
+  if (value === null || String(value).trim() === '') {
+    return null;
+  }
+
+  const normalized = String(value).trim().toUpperCase();
+
+  if (!BILLING_DOCUMENT_TYPES.includes(normalized)) {
+    throw new HttpError(400, `billingDocumentType must be one of: ${BILLING_DOCUMENT_TYPES.join(', ')}`);
+  }
+
+  return normalized;
 }
 
 function normalizeOptionalEmail(value, fieldName, options = {}) {
@@ -302,9 +332,16 @@ async function hydrateOrders(orders, connection) {
     customerName: order.customerName,
     customerEmail: order.customerEmail,
     customerPhone: order.customerPhone,
+    billingDocument: order.billingDocument,
+    billingDocumentType: order.billingDocumentType,
+    billingCity: order.billingCity,
     shippingAddress: order.shippingAddress,
     includesCard: order.includesCard,
     cardMessage: order.cardMessage,
+    receiverName: order.receiverName,
+    receiverPhone: order.receiverPhone,
+    cardSignature: order.cardSignature,
+    deliveryDate: order.deliveryDate,
     shipping: order.shippingMethodId || order.shippingName || order.shippingPrice
       ? {
         shippingMethodId: order.shippingMethodId,
@@ -318,6 +355,7 @@ async function hydrateOrders(orders, connection) {
     taxTotal: order.taxTotal,
     total: order.total,
     status: order.status,
+    isPaid: order.isPaid,
     paymentProvider: order.paymentProvider,
     paymentReference: order.paymentReference,
     createdAt: order.createdAt,
@@ -345,10 +383,25 @@ function resolveCustomerSnapshot(payload, user, currentOrder = null) {
   const customerPhone = normalizeOptionalText(payload.customerPhone, 'customerPhone', {
     defaultValue: currentOrder ? currentOrder.customerPhone : null,
     maxLength: 50,
+    required: true,
+  });
+  const billingDocument = normalizeOptionalText(payload.billingDocument, 'billingDocument', {
+    defaultValue: currentOrder ? currentOrder.billingDocument : null,
+    maxLength: 50,
+    required: true,
+  });
+  const billingDocumentType = normalizeBillingDocumentType(payload.billingDocumentType, {
+    defaultValue: currentOrder ? currentOrder.billingDocumentType : null,
+  });
+  const billingCity = normalizeOptionalText(payload.billingCity, 'billingCity', {
+    defaultValue: currentOrder ? currentOrder.billingCity : null,
+    maxLength: 100,
+    required: true,
   });
   const shippingAddress = normalizeOptionalText(payload.shippingAddress, 'shippingAddress', {
     defaultValue: currentOrder ? currentOrder.shippingAddress : null,
     maxLength: 255,
+    required: true,
   });
   const includesCard = payload.includesCard === undefined
     ? (currentOrder ? currentOrder.includesCard : false)
@@ -359,14 +412,41 @@ function resolveCustomerSnapshot(payload, user, currentOrder = null) {
       maxLength: 500,
     })
     : null;
+  const receiverName = normalizeOptionalText(payload.receiverName, 'receiverName', {
+    defaultValue: currentOrder ? currentOrder.receiverName : null,
+    maxLength: 150,
+    required: true,
+  });
+  const receiverPhone = normalizeOptionalText(payload.receiverPhone, 'receiverPhone', {
+    defaultValue: currentOrder ? currentOrder.receiverPhone : null,
+    maxLength: 50,
+    required: true,
+  });
+  const cardSignature = normalizeOptionalText(payload.cardSignature, 'cardSignature', {
+    defaultValue: currentOrder ? currentOrder.cardSignature : null,
+    maxLength: 150,
+  });
+  const rawDeliveryDate = payload.deliveryDate !== undefined
+    ? payload.deliveryDate
+    : (currentOrder ? currentOrder.deliveryDate : undefined);
+  const deliveryDate = rawDeliveryDate
+    ? String(rawDeliveryDate).slice(0, 10)
+    : null;
 
   return {
     customerName,
     customerEmail,
     customerPhone,
+    billingDocument,
+    billingDocumentType,
+    billingCity,
     shippingAddress,
     includesCard,
     cardMessage,
+    receiverName,
+    receiverPhone,
+    cardSignature,
+    deliveryDate,
   };
 }
 
@@ -472,6 +552,7 @@ async function listOrders(query = {}) {
   const filters = {
     ...pagination,
     status: query.status ? normalizeOrderStatus(query.status) : undefined,
+    isPaid: query.isPaid === 'true' ? true : query.isPaid === 'false' ? false : undefined,
     userId: query.userId !== undefined ? normalizePositiveInteger(query.userId, 'userId') : undefined,
     shippingMethodId: query.shippingMethodId !== undefined
       ? normalizePositiveInteger(query.shippingMethodId, 'shippingMethodId')
@@ -501,6 +582,16 @@ async function createOrder(actorUserId, payload) {
       ? null
       : normalizePositiveInteger(actorUserId, 'userId'));
   const status = normalizeOrderStatus(payload.status, { defaultValue: 'pending' });
+  const isPaid = payload.isPaid !== undefined ? normalizeBoolean(payload.isPaid, 'isPaid') : false;
+
+  if (isPaid && status === 'pending') {
+    throw new HttpError(400, 'Una orden pendiente no puede estar marcada como pagada');
+  }
+
+  if (status === 'completed' && !isPaid) {
+    throw new HttpError(400, 'Una orden no pagada no puede crearse con estado completado');
+  }
+
   const normalizedItems = normalizeOrderItems(payload.items);
   ensureUniqueProductIds(normalizedItems);
 
@@ -543,14 +634,22 @@ async function createOrder(actorUserId, payload) {
         customerName: customerSnapshot.customerName,
         customerEmail: customerSnapshot.customerEmail,
         customerPhone: customerSnapshot.customerPhone,
+        billingDocument: customerSnapshot.billingDocument,
+        billingDocumentType: customerSnapshot.billingDocumentType,
+        billingCity: customerSnapshot.billingCity,
         shippingAddress: customerSnapshot.shippingAddress,
         includesCard: customerSnapshot.includesCard,
         cardMessage: customerSnapshot.cardMessage,
+        receiverName: customerSnapshot.receiverName,
+        receiverPhone: customerSnapshot.receiverPhone,
+        cardSignature: customerSnapshot.cardSignature,
+        deliveryDate: customerSnapshot.deliveryDate,
         subtotal: totals.subtotal,
         taxTotal: totals.taxTotal,
         total: totals.total,
         status,
-        paymentProvider: payload.paymentReference ? 'mercadopago' : null,
+        isPaid,
+        paymentProvider: normalizePaymentProvider(payload.paymentProvider, { defaultValue: payload.paymentReference ? 'mercadopago' : null }),
         paymentReference: payload.paymentReference ?? null,
       },
       connection
@@ -577,9 +676,29 @@ async function updateOrder(orderId, payload) {
     await connection.beginTransaction();
     const existingOrder = await getExistingOrderForMutation(normalizedOrderId, connection);
 
+    if (existingOrder.status === 'completed') {
+      const hasShipping = (existingOrder.shipping?.price ?? 0) > 0;
+      const restricted = [
+        'userId', 'customerName', 'customerEmail', 'customerPhone',
+        'billingDocument', 'billingDocumentType', 'billingCity',
+        'shippingMethodId', 'includeShippingPrice', 'shippingPrice',
+        'items', 'deliveryDate', 'cardMessage', 'cardSignature', 'includesCard',
+        'status', 'isPaid', 'paymentProvider',
+        ...(hasShipping ? [] : ['receiverName', 'receiverPhone', 'shippingAddress']),
+      ];
+      const violations = restricted.filter((f) => Object.prototype.hasOwnProperty.call(payload, f));
+      if (violations.length) {
+        throw new HttpError(400, hasShipping
+          ? 'Una orden completada solo permite actualizar receptor y dirección de envío'
+          : 'Una orden completada no puede modificarse');
+      }
+    }
+
     if (existingOrder.paymentProvider === 'mercadopago') {
       const restrictedFields = ['userId', 'customerName', 'customerEmail', 'customerPhone',
-        'shippingAddress', 'shippingMethodId', 'includeShippingPrice', 'shippingPrice', 'items'];
+        'billingDocument', 'billingCity', 'shippingAddress', 'shippingMethodId',
+        'includeShippingPrice', 'shippingPrice', 'items', 'receiverName', 'receiverPhone',
+        'deliveryDate', 'paymentProvider'];
       const providedRestricted = restrictedFields.filter(
         (field) => Object.prototype.hasOwnProperty.call(payload, field)
       );
@@ -594,6 +713,25 @@ async function updateOrder(orderId, payload) {
     const nextStatus = payload.status !== undefined
       ? normalizeOrderStatus(payload.status)
       : existingOrder.status;
+    const nextIsPaid = payload.isPaid !== undefined
+      ? normalizeBoolean(payload.isPaid, 'isPaid')
+      : existingOrder.isPaid;
+    const nextPaymentProvider = normalizePaymentProvider(payload.paymentProvider, {
+      defaultValue: existingOrder.paymentProvider,
+    });
+
+    if (existingOrder.status !== 'pending' && nextStatus === 'pending') {
+      throw new HttpError(400, 'Una orden confirmada no puede volver a estado pendiente');
+    }
+
+    if (nextIsPaid && nextStatus === 'pending') {
+      throw new HttpError(400, 'Una orden pendiente no puede estar marcada como pagada');
+    }
+
+    if (nextStatus === 'completed' && !nextIsPaid) {
+      throw new HttpError(400, 'Una orden no pagada no puede cambiar a estado completado');
+    }
+
     const nextItems = payload.items !== undefined
       ? normalizeOrderItems(payload.items)
       : existingOrder.items.map((item) => ({
@@ -645,13 +783,22 @@ async function updateOrder(orderId, payload) {
         customerName: customerSnapshot.customerName,
         customerEmail: customerSnapshot.customerEmail,
         customerPhone: customerSnapshot.customerPhone,
+        billingDocument: customerSnapshot.billingDocument,
+        billingDocumentType: customerSnapshot.billingDocumentType,
+        billingCity: customerSnapshot.billingCity,
         shippingAddress: customerSnapshot.shippingAddress,
         includesCard: customerSnapshot.includesCard,
         cardMessage: customerSnapshot.cardMessage,
+        receiverName: customerSnapshot.receiverName,
+        receiverPhone: customerSnapshot.receiverPhone,
+        cardSignature: customerSnapshot.cardSignature,
+        deliveryDate: customerSnapshot.deliveryDate,
         subtotal: totals.subtotal,
         taxTotal: totals.taxTotal,
         total: totals.total,
         status: nextStatus,
+        isPaid: nextIsPaid,
+        paymentProvider: nextPaymentProvider,
       },
       connection
     );
@@ -668,43 +815,36 @@ async function updateOrder(orderId, payload) {
   }
 }
 
-async function deleteOrder(orderId) {
+async function exportOrders(query = {}) {
+  const filters = {
+    pageSize: 100000,
+    offset: 0,
+    status: query.status ? normalizeOrderStatus(query.status) : undefined,
+    isPaid: query.isPaid === 'true' ? true : query.isPaid === 'false' ? false : undefined,
+    sortBy: query.sortBy,
+    sortOrder: query.sortOrder,
+  };
+  const { items } = await Order.listAll(filters);
+  return hydrateOrders(items);
+}
+
+async function toggleOrderActive(orderId) {
   const normalizedOrderId = normalizePositiveInteger(orderId, 'orderId');
-  const connection = await pool.getConnection();
+  const order = await Order.findById(normalizedOrderId);
 
-  try {
-    await connection.beginTransaction();
-    const existingOrder = await getExistingOrderForMutation(normalizedOrderId, connection);
-    const productIds = [...new Set(existingOrder.items.map((item) => item.productId))];
-    const productsById = productIds.length
-      ? await lockProducts(productIds, connection)
-      : new Map();
-    const stockByProductId = new Map();
-
-    for (const product of productsById.values()) {
-      stockByProductId.set(product.id, product.stock);
-    }
-
-    for (const item of existingOrder.items) {
-      stockByProductId.set(item.productId, (stockByProductId.get(item.productId) || 0) + item.quantity);
-    }
-
-    await persistStocks(stockByProductId, connection);
-    await Order.remove(normalizedOrderId, connection);
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
+  if (!order) {
+    throw new HttpError(404, 'Order not found');
   }
 
-  return { message: 'Order deleted successfully' };
+  const nextActive = !order.isActive;
+  await Order.update(normalizedOrderId, { isActive: nextActive });
+  return { message: nextActive ? 'Order activated successfully' : 'Order deactivated successfully', isActive: nextActive };
 }
 
 module.exports = {
   createOrder,
-  deleteOrder,
+  exportOrders,
+  toggleOrderActive,
   getOrderById,
   listOrders,
   updateOrder,

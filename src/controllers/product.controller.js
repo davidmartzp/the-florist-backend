@@ -49,9 +49,9 @@ async function updateProduct(req, res) {
   }
 }
 
-async function deleteProduct(req, res) {
+async function toggleProductActive(req, res) {
   try {
-    const result = await productService.deleteProduct(req.params.productId);
+    const result = await productService.toggleProductActive(req.params.productId);
     res.json(result);
   } catch (error) {
     res.status(getStatusCode(error)).json({ error: error.message });
@@ -60,7 +60,7 @@ async function deleteProduct(req, res) {
 
 module.exports = {
   createProduct,
-  deleteProduct,
+  toggleProductActive,
   getProduct,
   listProductPriceHistory,
   listProducts,

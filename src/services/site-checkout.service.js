@@ -95,6 +95,22 @@ function normalizeCartItems(cart) {
   });
 }
 
+const BILLING_DOCUMENT_TYPES = ['CC', 'CE', 'NIT', 'PASAPORTE'];
+
+function normalizeBillingDocumentType(value) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return null;
+  }
+
+  const normalized = String(value).trim().toUpperCase();
+
+  if (!BILLING_DOCUMENT_TYPES.includes(normalized)) {
+    throw new HttpError(400, `billingDocumentType must be one of: ${BILLING_DOCUMENT_TYPES.join(', ')}`);
+  }
+
+  return normalized;
+}
+
 function normalizeReturnUrl(value) {
   if (value === undefined || value === null) {
     return null;
@@ -119,8 +135,15 @@ async function createCheckoutPreference(payload) {
   const customerName = normalizeString(payload.customerName, 'customerName', { required: true, maxLength: 150 });
   const customerPhone = normalizeString(payload.customerPhone, 'customerPhone', { required: true, maxLength: 50 });
   const customerEmail = normalizeEmail(payload.customerEmail, 'customerEmail', { required: true, maxLength: 150 });
-  const shippingAddress = normalizeString(payload.deliveryAddress, 'deliveryAddress', { maxLength: 255 });
+  const billingDocument = normalizeString(payload.billingDocument, 'billingDocument', { required: true, maxLength: 50 });
+  const billingDocumentType = normalizeBillingDocumentType(payload.billingDocumentType);
+  const billingCity = normalizeString(payload.billingCity, 'billingCity', { required: true, maxLength: 100 });
+  const shippingAddress = normalizeString(payload.deliveryAddress, 'deliveryAddress', { required: true, maxLength: 255 });
   const cardMessage = normalizeString(payload.cardMessage, 'cardMessage', { maxLength: 500 });
+  const receiverName = normalizeString(payload.receiverName, 'receiverName', { required: true, maxLength: 150 });
+  const receiverPhone = normalizeString(payload.receiverPhone, 'receiverPhone', { required: true, maxLength: 50 });
+  const cardSignature = normalizeString(payload.cardSignature, 'cardSignature', { maxLength: 150 });
+  const deliveryDate = normalizeString(payload.deliveryDate, 'deliveryDate', { required: true });
   const shippingMethodId = payload.shippingMethodId === null || payload.shippingMethodId === undefined || payload.shippingMethodId === ''
     ? null
     : normalizePositiveInteger(payload.shippingMethodId, 'shippingMethodId');
@@ -204,9 +227,16 @@ async function createCheckoutPreference(payload) {
       customerName,
       customerPhone,
       customerEmail,
+      billingDocument,
+      billingDocumentType,
+      billingCity,
       deliveryAddress: shippingAddress,
       cardMessage,
       shippingMethodId,
+      receiverName,
+      receiverPhone,
+      cardSignature,
+      deliveryDate,
     },
     status: 'created',
   });
@@ -271,12 +301,20 @@ async function confirmCheckoutPayment(payload) {
       customerName: session.payload.customerName,
       customerEmail: session.payload.customerEmail,
       customerPhone: session.payload.customerPhone,
+      billingDocument: session.payload.billingDocument,
+      billingDocumentType: session.payload.billingDocumentType,
+      billingCity: session.payload.billingCity,
       shippingAddress: session.payload.deliveryAddress,
       includesCard: !!session.payload.cardMessage,
       cardMessage: session.payload.cardMessage,
+      receiverName: session.payload.receiverName,
+      receiverPhone: session.payload.receiverPhone,
+      cardSignature: session.payload.cardSignature,
+      deliveryDate: session.payload.deliveryDate,
       shippingMethodId: session.payload.shippingMethodId,
       paymentReference: collectionId,
-      status: 'pending',
+      isPaid: true,
+      status: 'confirmed',
     };
 
     const order = await OrderService.createOrder(null, orderPayload);
@@ -350,12 +388,20 @@ async function processWebhook(payload) {
       customerName: session.payload.customerName,
       customerEmail: session.payload.customerEmail,
       customerPhone: session.payload.customerPhone,
+      billingDocument: session.payload.billingDocument,
+      billingDocumentType: session.payload.billingDocumentType,
+      billingCity: session.payload.billingCity,
       shippingAddress: session.payload.deliveryAddress,
       includesCard: !!session.payload.cardMessage,
       cardMessage: session.payload.cardMessage,
+      receiverName: session.payload.receiverName,
+      receiverPhone: session.payload.receiverPhone,
+      cardSignature: session.payload.cardSignature,
+      deliveryDate: session.payload.deliveryDate,
       shippingMethodId: session.payload.shippingMethodId,
       paymentReference: String(dataId),
-      status: 'pending',
+      isPaid: true,
+      status: 'confirmed',
     };
 
     const order = await OrderService.createOrder(null, orderPayload);

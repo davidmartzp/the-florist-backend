@@ -50,23 +50,14 @@ async function createTag(payload) {
   return Tag.create({ name, slug });
 }
 
-async function deleteTag(tagId) {
-  await ensureTagExists(tagId);
-
-  try {
-    await Tag.remove(tagId);
-  } catch (error) {
-    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      throw new HttpError(409, 'Cannot delete a tag assigned to products');
-    }
-
-    throw error;
-  }
-
-  return { message: 'Tag deleted successfully' };
+async function toggleTagActive(tagId) {
+  const tag = await ensureTagExists(tagId);
+  const nextActive = !tag.isActive;
+  await Tag.update(tagId, { isActive: nextActive });
+  return { message: nextActive ? 'Tag activated successfully' : 'Tag deactivated successfully', isActive: nextActive };
 }
 
 module.exports = {
   createTag,
-  deleteTag,
+  toggleTagActive,
 };

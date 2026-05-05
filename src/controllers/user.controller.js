@@ -40,9 +40,9 @@ async function updateUser(req, res) {
   }
 }
 
-async function deactivateUser(req, res) {
+async function toggleUserActive(req, res) {
   try {
-    const user = await userService.deactivateUser(req.user.id, req.params.userId);
+    const user = await userService.toggleUserActive(req.user.id, req.params.userId);
     res.json(user);
   } catch (error) {
     res.status(getStatusCode(error)).json({ error: error.message });
@@ -60,9 +60,9 @@ async function getAccessControlCatalog(_req, res) {
 
 module.exports = {
   createUser,
-  deactivateUser,
   getAccessControlCatalog,
   getUser,
   listUsers,
+  toggleUserActive,
   updateUser,
 };

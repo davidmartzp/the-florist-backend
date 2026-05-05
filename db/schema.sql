@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS tags (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   name VARCHAR(100) NOT NULL,
   slug VARCHAR(130) NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -690,5 +691,141 @@ SET @orders_is_active_sql := IF(
   'SELECT 1'
 );
 PREPARE stmt FROM @orders_is_active_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+
+SET @tags_is_active_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'tags'
+    AND COLUMN_NAME = 'is_active'
+);
+SET @tags_is_active_sql := IF(
+  @tags_is_active_exists = 0,
+  'ALTER TABLE tags ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER slug',
+  'SELECT 1'
+);
+PREPARE stmt FROM @tags_is_active_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @orders_is_paid_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'is_paid'
+);
+SET @orders_is_paid_sql := IF(
+  @orders_is_paid_exists = 0,
+  'ALTER TABLE orders ADD COLUMN is_paid TINYINT(1) NOT NULL DEFAULT 0 AFTER status',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_is_paid_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @orders_billing_document_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'billing_document'
+);
+SET @orders_billing_document_sql := IF(
+  @orders_billing_document_exists = 0,
+  'ALTER TABLE orders ADD COLUMN billing_document VARCHAR(50) NULL AFTER customer_phone',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_billing_document_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @orders_billing_document_type_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'billing_document_type'
+);
+SET @orders_billing_document_type_sql := IF(
+  @orders_billing_document_type_exists = 0,
+  'ALTER TABLE orders ADD COLUMN billing_document_type VARCHAR(20) NULL AFTER billing_document',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_billing_document_type_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @orders_billing_city_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'billing_city'
+);
+SET @orders_billing_city_sql := IF(
+  @orders_billing_city_exists = 0,
+  'ALTER TABLE orders ADD COLUMN billing_city VARCHAR(100) NULL AFTER billing_document_type',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_billing_city_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @orders_receiver_name_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'receiver_name'
+);
+SET @orders_receiver_name_sql := IF(
+  @orders_receiver_name_exists = 0,
+  'ALTER TABLE orders ADD COLUMN receiver_name VARCHAR(150) NULL AFTER shipping_address',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_receiver_name_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @orders_receiver_phone_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'receiver_phone'
+);
+SET @orders_receiver_phone_sql := IF(
+  @orders_receiver_phone_exists = 0,
+  'ALTER TABLE orders ADD COLUMN receiver_phone VARCHAR(50) NULL AFTER receiver_name',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_receiver_phone_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @orders_delivery_date_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'delivery_date'
+);
+SET @orders_delivery_date_sql := IF(
+  @orders_delivery_date_exists = 0,
+  'ALTER TABLE orders ADD COLUMN delivery_date DATE NULL AFTER receiver_phone',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_delivery_date_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @orders_card_signature_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'card_signature'
+);
+SET @orders_card_signature_sql := IF(
+  @orders_card_signature_exists = 0,
+  'ALTER TABLE orders ADD COLUMN card_signature VARCHAR(150) NULL AFTER card_message',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_card_signature_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

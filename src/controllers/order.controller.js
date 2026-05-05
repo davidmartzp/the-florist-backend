@@ -40,9 +40,18 @@ async function updateOrder(req, res) {
   }
 }
 
-async function deleteOrder(req, res) {
+async function exportOrders(req, res) {
   try {
-    const result = await orderService.deleteOrder(req.params.orderId);
+    const orders = await orderService.exportOrders(req.query);
+    res.json(orders);
+  } catch (error) {
+    res.status(getStatusCode(error)).json({ error: error.message });
+  }
+}
+
+async function toggleOrderActive(req, res) {
+  try {
+    const result = await orderService.toggleOrderActive(req.params.orderId);
     res.json(result);
   } catch (error) {
     res.status(getStatusCode(error)).json({ error: error.message });
@@ -51,7 +60,8 @@ async function deleteOrder(req, res) {
 
 module.exports = {
   createOrder,
-  deleteOrder,
+  exportOrders,
+  toggleOrderActive,
   getOrder,
   listOrders,
   updateOrder,

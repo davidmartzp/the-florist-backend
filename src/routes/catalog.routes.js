@@ -10,7 +10,7 @@ router.get('/', controller.listCatalogs);
 router.get('/:catalogId', controller.getCatalog);
 router.post('/', controller.createCatalog);
 router.patch('/:catalogId', controller.updateCatalog);
-router.delete('/:catalogId', controller.deleteCatalog);
+router.patch('/:catalogId/toggle-active', controller.toggleCatalogActive);
 
 module.exports = router;
 

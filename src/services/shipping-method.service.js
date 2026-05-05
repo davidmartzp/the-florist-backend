@@ -142,15 +142,16 @@ async function updateShippingMethod(shippingMethodId, payload) {
   return ShippingMethod.update(shippingMethodId, updates);
 }
 
-async function deleteShippingMethod(shippingMethodId) {
-  await ensureShippingMethodExists(shippingMethodId);
-  await ShippingMethod.remove(shippingMethodId);
-  return { message: 'Shipping method deleted successfully' };
+async function toggleShippingMethodActive(shippingMethodId) {
+  const shippingMethod = await ensureShippingMethodExists(shippingMethodId);
+  const nextActive = !shippingMethod.isActive;
+  await ShippingMethod.update(shippingMethodId, { isActive: nextActive });
+  return { message: nextActive ? 'Shipping method activated successfully' : 'Shipping method deactivated successfully', isActive: nextActive };
 }
 
 module.exports = {
   createShippingMethod,
-  deleteShippingMethod,
+  toggleShippingMethodActive,
   getShippingMethodById,
   listShippingMethods,
   updateShippingMethod,

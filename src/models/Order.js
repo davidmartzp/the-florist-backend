@@ -4,6 +4,12 @@ function getExecutor(connection) {
   return connection || pool;
 }
 
+function formatDateOnly(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
 function mapOrder(row) {
   if (!row) {
     return null;
@@ -21,12 +27,20 @@ function mapOrder(row) {
     customerEmail: row.customer_email,
     customerPhone: row.customer_phone,
     shippingAddress: row.shipping_address,
+    billingDocument: row.billing_document,
+    billingDocumentType: row.billing_document_type,
+    billingCity: row.billing_city,
     includesCard: Boolean(row.includes_card),
     cardMessage: row.card_message,
+    receiverName: row.receiver_name,
+    receiverPhone: row.receiver_phone,
+    cardSignature: row.card_signature,
+    deliveryDate: formatDateOnly(row.delivery_date),
     subtotal: Number(row.subtotal),
     taxTotal: Number(row.tax_total),
     total: Number(row.total),
     status: row.status,
+    isPaid: Boolean(row.is_paid),
     isActive: Boolean(row.is_active),
     paymentProvider: row.payment_provider,
     paymentReference: row.payment_reference,
@@ -80,6 +94,11 @@ async function listAll(filters = {}) {
     values.push(filters.shippingMethodId);
   }
 
+  if (filters.isPaid !== undefined) {
+    whereClauses.push('o.is_paid = ?');
+    values.push(filters.isPaid ? 1 : 0);
+  }
+
   if (filters.isActive !== undefined) {
     whereClauses.push('o.is_active = ?');
     values.push(filters.isActive ? 1 : 0);
@@ -106,8 +125,9 @@ async function listAll(filters = {}) {
     `
       SELECT o.id, o.code, o.user_id, o.shipping_method_id, o.shipping_name, o.shipping_price,
              o.includes_shipping_price, o.customer_name, o.customer_email, o.customer_phone,
-             o.shipping_address, o.includes_card, o.card_message,
-             o.subtotal, o.tax_total, o.total, o.status, o.is_active,
+             o.billing_document, o.billing_document_type, o.billing_city, o.shipping_address, o.includes_card, o.card_message,
+             o.receiver_name, o.receiver_phone, o.card_signature, o.delivery_date,
+             o.subtotal, o.tax_total, o.total, o.status, o.is_paid, o.is_active,
              o.payment_provider, o.payment_reference,
              o.created_at, o.updated_at
       FROM orders o
@@ -131,8 +151,9 @@ async function findById(id, connection, options = {}) {
     `
       SELECT id, code, user_id, shipping_method_id, shipping_name, shipping_price,
              includes_shipping_price, customer_name, customer_email, customer_phone,
-             shipping_address, includes_card, card_message,
-             subtotal, tax_total, total, status, is_active,
+             billing_document, billing_document_type, billing_city, shipping_address, includes_card, card_message,
+             receiver_name, receiver_phone, card_signature, delivery_date,
+             subtotal, tax_total, total, status, is_paid, is_active,
              payment_provider, payment_reference,
              created_at, updated_at
       FROM orders
@@ -172,17 +193,25 @@ async function create(orderData, connection) {
         customer_name,
         customer_email,
         customer_phone,
+        billing_document,
+        billing_document_type,
+        billing_city,
         shipping_address,
         includes_card,
         card_message,
+        receiver_name,
+        receiver_phone,
+        card_signature,
+        delivery_date,
         subtotal,
         tax_total,
         total,
         status,
+        is_paid,
         payment_provider,
         payment_reference
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       orderData.code,
@@ -194,13 +223,21 @@ async function create(orderData, connection) {
       orderData.customerName,
       orderData.customerEmail,
       orderData.customerPhone,
+      orderData.billingDocument,
+      orderData.billingDocumentType ?? null,
+      orderData.billingCity,
       orderData.shippingAddress,
       orderData.includesCard,
       orderData.cardMessage,
+      orderData.receiverName,
+      orderData.receiverPhone,
+      orderData.cardSignature,
+      orderData.deliveryDate,
       orderData.subtotal,
       orderData.taxTotal,
       orderData.total,
       orderData.status,
+      orderData.isPaid ? 1 : 0,
       orderData.paymentProvider || null,
       orderData.paymentReference || null,
     ]
@@ -254,6 +291,21 @@ async function update(id, updates, connection) {
     values.push(updates.customerPhone);
   }
 
+  if (updates.billingDocument !== undefined) {
+    fields.push('billing_document = ?');
+    values.push(updates.billingDocument);
+  }
+
+  if (updates.billingDocumentType !== undefined) {
+    fields.push('billing_document_type = ?');
+    values.push(updates.billingDocumentType);
+  }
+
+  if (updates.billingCity !== undefined) {
+    fields.push('billing_city = ?');
+    values.push(updates.billingCity);
+  }
+
   if (updates.shippingAddress !== undefined) {
     fields.push('shipping_address = ?');
     values.push(updates.shippingAddress);
@@ -267,6 +319,26 @@ async function update(id, updates, connection) {
   if (updates.cardMessage !== undefined) {
     fields.push('card_message = ?');
     values.push(updates.cardMessage);
+  }
+
+  if (updates.receiverName !== undefined) {
+    fields.push('receiver_name = ?');
+    values.push(updates.receiverName);
+  }
+
+  if (updates.receiverPhone !== undefined) {
+    fields.push('receiver_phone = ?');
+    values.push(updates.receiverPhone);
+  }
+
+  if (updates.cardSignature !== undefined) {
+    fields.push('card_signature = ?');
+    values.push(updates.cardSignature);
+  }
+
+  if (updates.deliveryDate !== undefined) {
+    fields.push('delivery_date = ?');
+    values.push(updates.deliveryDate);
   }
 
   if (updates.paymentProvider !== undefined) {
@@ -297,6 +369,11 @@ async function update(id, updates, connection) {
   if (updates.status !== undefined) {
     fields.push('status = ?');
     values.push(updates.status);
+  }
+
+  if (updates.isPaid !== undefined) {
+    fields.push('is_paid = ?');
+    values.push(updates.isPaid ? 1 : 0);
   }
 
   if (!fields.length) {

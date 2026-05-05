@@ -7,6 +7,6 @@ router.use(auth);
 router.use(requirePermissions('PRODUCTS'));
 
 router.post('/', controller.createTag);
-router.delete('/:tagId', controller.deleteTag);
+router.patch('/:tagId/toggle-active', controller.toggleTagActive);
 
 module.exports = router;

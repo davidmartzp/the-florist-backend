@@ -10,7 +10,7 @@ router.get('/', controller.listCategories);
 router.get('/:categoryId', controller.getCategory);
 router.post('/', controller.createCategory);
 router.patch('/:categoryId', controller.updateCategory);
-router.delete('/:categoryId', controller.deleteCategory);
+router.patch('/:categoryId/toggle-active', controller.toggleCategoryActive);
 
 module.exports = router;
 
