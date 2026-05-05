@@ -280,7 +280,7 @@ async function confirmCheckoutPayment(payload) {
 
   let payment;
   try {
-    payment = await paymentApi.get({ id: collectionId });
+    payment = await paymentApi.get({ id: Number(collectionId) });
   } catch (mpError) {
     throw new HttpError(502, `MercadoPago verification failed: ${mpError.message || 'Unknown error'}`);
   }
@@ -373,8 +373,6 @@ async function processWebhook(payload, headers = {}) {
   }
 
   if (!verifyWebhookSignature(headers, dataId)) {
-    // eslint-disable-next-line no-console
-    console.warn('[Webhook] Invalid signature, ignoring');
     return { processed: false, reason: 'Invalid signature' };
   }
 
@@ -397,30 +395,14 @@ async function processWebhook(payload, headers = {}) {
     } catch (mpError) {
       const is404 = mpError?.status === 404 || mpError?.cause?.[0]?.code === 2000;
       if (is404) {
-        // eslint-disable-next-line no-console
-        console.log('[Webhook] Payment not found in MP (id=%s), skipping', dataId);
         return { processed: false, reason: 'Payment not found' };
       }
       if (attempts === 0) {
-        // eslint-disable-next-line no-console
-        console.error('[Webhook] MP get payment error:', mpError);
         throw new HttpError(502, `MercadoPago verification failed: ${mpError.message || 'Unknown error'}`);
       }
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
-
-  // eslint-disable-next-line no-console
-  console.log('[Webhook] Pago completo MP: %j', payment);
-  // eslint-disable-next-line no-console
-  console.log('[Webhook] Pago obtenido | id=%s | status=%s | monto=%s %s | fecha=%s | payer=%s',
-    payment.id,
-    payment.status,
-    payment.currency_id,
-    payment.transaction_amount,
-    payment.date_approved || payment.date_created,
-    payment.payer?.email || '(sin email)'
-  );
 
   // Validación de estado
   if (!payment || payment.status !== 'approved') {
@@ -434,9 +416,6 @@ async function processWebhook(payload, headers = {}) {
 
   const externalReference = payment.external_reference || null;
   const preferenceId = payment.preference_id || null;
-
-  // eslint-disable-next-line no-console
-  console.log('[Webhook] external_reference=%s | preference_id=%s', externalReference || '(ausente)', preferenceId || '(ausente)');
 
   if (!externalReference && !preferenceId) {
     return {
@@ -454,9 +433,6 @@ async function processWebhook(payload, headers = {}) {
     const session = externalReference
       ? await CheckoutSession.findByExternalReferenceForUpdate(externalReference, connection)
       : await CheckoutSession.findByPreferenceIdForUpdate(preferenceId, connection);
-
-    // eslint-disable-next-line no-console
-    console.log('[Webhook] session=%s orderId=%s', session ? session.id : '(no encontrada)', session?.orderId || 'null');
 
     if (!session) {
       await connection.commit();
