@@ -211,9 +211,10 @@ async function create(orderData, connection) {
         status,
         is_paid,
         payment_provider,
-        payment_reference
+        payment_reference,
+        created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, UTC_TIMESTAMP()))
     `,
     [
       orderData.code,
@@ -243,6 +244,7 @@ async function create(orderData, connection) {
       orderData.isPaid ? 1 : 0,
       orderData.paymentProvider || null,
       orderData.paymentReference || null,
+      orderData.createdAt || null,
     ]
   );
 

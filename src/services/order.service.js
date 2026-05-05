@@ -184,11 +184,19 @@ function ensureUniqueProductIds(items) {
   }
 }
 
-async function generateOrderCode(connection) {
-  const now = new Date();
-  const month = MONTHS_ES[now.getMonth()];
-  const year = String(now.getFullYear());
-  const day = String(now.getDate()).padStart(2, '0');
+async function generateOrderCode(connection, date = null) {
+  let year, month, day;
+  if (date) {
+    const [y, m, d] = String(date).slice(0, 10).split('-').map(Number);
+    year = String(y);
+    month = MONTHS_ES[m - 1];
+    day = String(d).padStart(2, '0');
+  } else {
+    const now = new Date();
+    year = String(now.getFullYear());
+    month = MONTHS_ES[now.getMonth()];
+    day = String(now.getDate()).padStart(2, '0');
+  }
   const prefix = `${month}${year}${day}`;
   const maxCounter = await Order.getMaxDailyCounter(prefix, connection);
   const counter = String(maxCounter + 1).padStart(4, '0');
@@ -551,7 +559,7 @@ async function getExistingOrderForMutation(orderId, connection) {
 async function listOrders(query = {}) {
   const pagination = parseListQuery(query, {
     allowedSortBy: ['createdAt', 'updatedAt', 'subtotal', 'taxTotal', 'total', 'shippingPrice', 'status'],
-    defaultSortBy: 'createdAt',
+    defaultSortBy: 'code',
     defaultSortOrder: 'desc',
   });
   const filters = {
@@ -597,6 +605,8 @@ async function createOrder(actorUserId, payload) {
     throw new HttpError(400, 'Una orden no pagada no puede crearse con estado completado');
   }
 
+  const orderDate = payload.orderDate ? String(payload.orderDate).slice(0, 10) : null;
+
   const normalizedItems = normalizeOrderItems(payload.items);
   ensureUniqueProductIds(normalizedItems);
 
@@ -627,7 +637,7 @@ async function createOrder(actorUserId, payload) {
     }
 
     const totals = buildItemsAndTotals(normalizedItems, productsById, shipping);
-    const code = await generateOrderCode(connection);
+    const code = await generateOrderCode(connection, orderDate);
     const order = await Order.create(
       {
         code,
@@ -654,6 +664,7 @@ async function createOrder(actorUserId, payload) {
         taxTotal: totals.taxTotal,
         total: totals.total,
         status,
+        createdAt: orderDate ? `${orderDate} 00:00:00` : null,
         isPaid,
         paymentProvider: normalizePaymentProvider(payload.paymentProvider, { defaultValue: payload.paymentReference ? 'mercadopago' : null }),
         paymentReference: payload.paymentReference ?? null,
