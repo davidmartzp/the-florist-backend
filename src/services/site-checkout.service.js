@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { pool } = require('../config/db');
 const CheckoutSession = require('../models/CheckoutSession');
 const OrderService = require('./order.service');
@@ -339,10 +340,26 @@ async function confirmCheckoutPayment(payload) {
   }
 }
 
-async function processWebhook(payload) {
+function verifyWebhookSignature(headers, dataId) {
+  const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+  if (!secret) return true; // si no está configurado, no bloquear
+
+  const xSignature = headers['x-signature'];
+  const xRequestId = headers['x-request-id'];
+  if (!xSignature) return false;
+
+  const ts = xSignature.split(',').find((p) => p.startsWith('ts='))?.split('=')[1];
+  const v1 = xSignature.split(',').find((p) => p.startsWith('v1='))?.split('=')[1];
+  if (!ts || !v1) return false;
+
+  const manifest = `id:${dataId};request-id:${xRequestId || ''};ts:${ts};`;
+  const computed = crypto.createHmac('sha256', secret).update(manifest).digest('hex');
+  return computed === v1;
+}
+
+async function processWebhook(payload, headers = {}) {
   const dataId = payload?.data?.id;
 
-  // Validación correcta del tipo de evento
   const isPayment =
     payload?.type === 'payment' ||
     payload?.action?.startsWith('payment.');
@@ -351,40 +368,35 @@ async function processWebhook(payload) {
     return { processed: false, reason: 'Not a payment notification' };
   }
 
+  if (!verifyWebhookSignature(headers, dataId)) {
+    // eslint-disable-next-line no-console
+    console.warn('[Webhook] Invalid signature, ignoring');
+    return { processed: false, reason: 'Invalid signature' };
+  }
+
   if (!process.env.MERCADOPAGO_ACCESS_TOKEN) {
     throw new HttpError(501, 'MERCADOPAGO_ACCESS_TOKEN not configured on server');
   }
 
   const { MercadoPagoConfig, Payment } = require('mercadopago');
-
-  const mpClient = new MercadoPagoConfig({
-    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
-  });
-
+  const mpClient = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
   const paymentApi = new Payment(mpClient);
 
-  // 🔁 Reintentos por posible delay de MP
+  // Reintentos: MP a veces envía el webhook antes de que el pago esté indexado
   let payment;
   let attempts = 3;
 
   while (attempts--) {
     try {
-      // Compatibilidad SDK (objeto vs id directo)
-      try {
-        payment = await paymentApi.get({ id: dataId });
-      } catch (e) {
-        payment = await paymentApi.get(dataId);
-      }
+      payment = await paymentApi.get({ id: Number(dataId) });
       break;
     } catch (mpError) {
       if (attempts === 0) {
-        console.error('MP ERROR FULL:', mpError);
-        throw new HttpError(
-          502,
-          `MercadoPago verification failed: ${mpError.message || 'Unknown error'}`
-        );
+        // eslint-disable-next-line no-console
+        console.error('[Webhook] MP get payment error:', mpError);
+        throw new HttpError(502, `MercadoPago verification failed: ${mpError.message || 'Unknown error'}`);
       }
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, 1500));
     }
   }
 
