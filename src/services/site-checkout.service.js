@@ -432,6 +432,9 @@ async function processWebhook(payload, headers = {}) {
     payment.metadata?.preference_id ||
     payment.additional_info?.items?.[0]?.id;
 
+  // eslint-disable-next-line no-console
+  console.log('[Webhook] preference_id=%s', preferenceId || '(no encontrado)');
+
   if (!preferenceId) {
     return {
       processed: false,
@@ -450,6 +453,9 @@ async function processWebhook(payload, headers = {}) {
         preferenceId,
         connection
       );
+
+    // eslint-disable-next-line no-console
+    console.log('[Webhook] session=%s orderId=%s', session ? session.id : '(no encontrada)', session?.orderId || 'null');
 
     if (!session) {
       await connection.commit();
