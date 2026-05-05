@@ -197,8 +197,11 @@ async function createCheckoutPreference(payload) {
     ? `${process.env.APP_URL}/api/site/checkout/webhook`
     : null;
 
+  const externalReference = crypto.randomUUID();
+
   const preference = {
     items: preferenceItems,
+    external_reference: externalReference,
     payer: {
       name: customerName,
       email: customerEmail,
@@ -224,6 +227,7 @@ async function createCheckoutPreference(payload) {
 
   await createCheckoutSession({
     preferenceId,
+    externalReference,
     payload: {
       cart: normalizedCart,
       customerName,
@@ -428,19 +432,16 @@ async function processWebhook(payload, headers = {}) {
     };
   }
 
-  // Obtener preference_id de forma segura
-  const preferenceId =
-    payment.preference_id ||
-    payment.metadata?.preference_id ||
-    payment.additional_info?.items?.[0]?.id;
+  const externalReference = payment.external_reference || null;
+  const preferenceId = payment.preference_id || null;
 
   // eslint-disable-next-line no-console
-  console.log('[Webhook] preference_id=%s', preferenceId || '(no encontrado)');
+  console.log('[Webhook] external_reference=%s | preference_id=%s', externalReference || '(ausente)', preferenceId || '(ausente)');
 
-  if (!preferenceId) {
+  if (!externalReference && !preferenceId) {
     return {
       processed: false,
-      reason: 'No preference_id found in payment',
+      reason: 'No external_reference nor preference_id found in payment',
       paymentId: dataId,
     };
   }
@@ -450,11 +451,9 @@ async function processWebhook(payload, headers = {}) {
   try {
     await connection.beginTransaction();
 
-    const session =
-      await CheckoutSession.findByPreferenceIdForUpdate(
-        preferenceId,
-        connection
-      );
+    const session = externalReference
+      ? await CheckoutSession.findByExternalReferenceForUpdate(externalReference, connection)
+      : await CheckoutSession.findByPreferenceIdForUpdate(preferenceId, connection);
 
     // eslint-disable-next-line no-console
     console.log('[Webhook] session=%s orderId=%s', session ? session.id : '(no encontrada)', session?.orderId || 'null');

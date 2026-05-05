@@ -31,6 +31,7 @@ function mapCheckoutSession(row) {
   return {
     id: row.id,
     preferenceId: row.preference_id,
+    externalReference: row.external_reference,
     payload,
     status: row.status,
     paymentReference: row.payment_reference,
@@ -41,20 +42,22 @@ function mapCheckoutSession(row) {
   };
 }
 
-async function create({ preferenceId, payload, status, paymentReference, orderId, orderCode }) {
+async function create({ preferenceId, externalReference, payload, status, paymentReference, orderId, orderCode }) {
   const [result] = await pool.execute(
     `
       INSERT INTO checkout_sessions (
         preference_id,
+        external_reference,
         payload,
         status,
         payment_reference,
         order_id,
         order_code
-      ) VALUES (?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
     [
       preferenceId,
+      externalReference || null,
       JSON.stringify(payload),
       status || 'created',
       paymentReference || null,
@@ -69,7 +72,7 @@ async function create({ preferenceId, payload, status, paymentReference, orderId
 async function findById(id) {
   const [rows] = await pool.execute(
     `
-      SELECT id, preference_id, payload, status, payment_reference, order_id, order_code, created_at, updated_at
+      SELECT id, preference_id, external_reference, payload, status, payment_reference, order_id, order_code, created_at, updated_at
       FROM checkout_sessions
       WHERE id = ?
       LIMIT 1
@@ -80,11 +83,27 @@ async function findById(id) {
   return mapCheckoutSession(rows[0]);
 }
 
+async function findByExternalReferenceForUpdate(externalReference, connection) {
+  const executor = connection || pool;
+  const [rows] = await executor.execute(
+    `
+      SELECT id, preference_id, external_reference, payload, status, payment_reference, order_id, order_code, created_at, updated_at
+      FROM checkout_sessions
+      WHERE external_reference = ?
+      LIMIT 1
+      FOR UPDATE
+    `,
+    [externalReference]
+  );
+
+  return mapCheckoutSession(rows[0]);
+}
+
 async function findByPreferenceId(preferenceId, connection) {
   const executor = connection || pool;
   const [rows] = await executor.execute(
     `
-      SELECT id, preference_id, payload, status, payment_reference, order_id, order_code, created_at, updated_at
+      SELECT id, preference_id, external_reference, payload, status, payment_reference, order_id, order_code, created_at, updated_at
       FROM checkout_sessions
       WHERE preference_id = ?
       LIMIT 1
@@ -99,7 +118,7 @@ async function findByPreferenceIdForUpdate(preferenceId, connection) {
   const executor = connection || pool;
   const [rows] = await executor.execute(
     `
-      SELECT id, preference_id, payload, status, payment_reference, order_id, order_code, created_at, updated_at
+      SELECT id, preference_id, external_reference, payload, status, payment_reference, order_id, order_code, created_at, updated_at
       FROM checkout_sessions
       WHERE preference_id = ?
       LIMIT 1
@@ -163,6 +182,7 @@ async function update(id, updates, connection) {
 module.exports = {
   create,
   findById,
+  findByExternalReferenceForUpdate,
   findByPreferenceId,
   findByPreferenceIdForUpdate,
   update,
