@@ -335,6 +335,7 @@ async function hydrateOrders(orders, connection) {
     billingDocument: order.billingDocument,
     billingDocumentType: order.billingDocumentType,
     billingCity: order.billingCity,
+    billingAddress: order.billingAddress,
     shippingAddress: order.shippingAddress,
     includesCard: order.includesCard,
     cardMessage: order.cardMessage,
@@ -398,10 +399,13 @@ function resolveCustomerSnapshot(payload, user, currentOrder = null) {
     maxLength: 100,
     required: true,
   });
+  const billingAddress = normalizeOptionalText(payload.billingAddress, 'billingAddress', {
+    defaultValue: currentOrder ? currentOrder.billingAddress : null,
+    maxLength: 255,
+  });
   const shippingAddress = normalizeOptionalText(payload.shippingAddress, 'shippingAddress', {
     defaultValue: currentOrder ? currentOrder.shippingAddress : null,
     maxLength: 255,
-    required: true,
   });
   const includesCard = payload.includesCard === undefined
     ? (currentOrder ? currentOrder.includesCard : false)
@@ -440,6 +444,7 @@ function resolveCustomerSnapshot(payload, user, currentOrder = null) {
     billingDocument,
     billingDocumentType,
     billingCity,
+    billingAddress,
     shippingAddress,
     includesCard,
     cardMessage,
@@ -637,6 +642,7 @@ async function createOrder(actorUserId, payload) {
         billingDocument: customerSnapshot.billingDocument,
         billingDocumentType: customerSnapshot.billingDocumentType,
         billingCity: customerSnapshot.billingCity,
+        billingAddress: customerSnapshot.billingAddress,
         shippingAddress: customerSnapshot.shippingAddress,
         includesCard: customerSnapshot.includesCard,
         cardMessage: customerSnapshot.cardMessage,
@@ -680,7 +686,7 @@ async function updateOrder(orderId, payload) {
       const hasShipping = (existingOrder.shipping?.price ?? 0) > 0;
       const restricted = [
         'userId', 'customerName', 'customerEmail', 'customerPhone',
-        'billingDocument', 'billingDocumentType', 'billingCity',
+        'billingDocument', 'billingDocumentType', 'billingCity', 'billingAddress',
         'shippingMethodId', 'includeShippingPrice', 'shippingPrice',
         'items', 'deliveryDate', 'cardMessage', 'cardSignature', 'includesCard',
         'status', 'isPaid', 'paymentProvider',
@@ -696,7 +702,7 @@ async function updateOrder(orderId, payload) {
 
     if (existingOrder.paymentProvider === 'mercadopago') {
       const restrictedFields = ['userId', 'customerName', 'customerEmail', 'customerPhone',
-        'billingDocument', 'billingCity', 'shippingAddress', 'shippingMethodId',
+        'billingDocument', 'billingCity', 'billingAddress', 'shippingAddress', 'shippingMethodId',
         'includeShippingPrice', 'shippingPrice', 'items', 'receiverName', 'receiverPhone',
         'deliveryDate', 'paymentProvider'];
       const providedRestricted = restrictedFields.filter(
@@ -719,6 +725,10 @@ async function updateOrder(orderId, payload) {
     const nextPaymentProvider = normalizePaymentProvider(payload.paymentProvider, {
       defaultValue: existingOrder.paymentProvider,
     });
+
+    if (existingOrder.paymentProvider === 'mercadopago' && nextIsPaid === false) {
+      throw new HttpError(400, 'Una orden pagada con MercadoPago no puede marcarse como no pagada');
+    }
 
     if (existingOrder.status !== 'pending' && nextStatus === 'pending') {
       throw new HttpError(400, 'Una orden confirmada no puede volver a estado pendiente');
@@ -786,6 +796,7 @@ async function updateOrder(orderId, payload) {
         billingDocument: customerSnapshot.billingDocument,
         billingDocumentType: customerSnapshot.billingDocumentType,
         billingCity: customerSnapshot.billingCity,
+        billingAddress: customerSnapshot.billingAddress,
         shippingAddress: customerSnapshot.shippingAddress,
         includesCard: customerSnapshot.includesCard,
         cardMessage: customerSnapshot.cardMessage,

@@ -26,10 +26,11 @@ function mapOrder(row) {
     customerName: row.customer_name,
     customerEmail: row.customer_email,
     customerPhone: row.customer_phone,
-    shippingAddress: row.shipping_address,
     billingDocument: row.billing_document,
     billingDocumentType: row.billing_document_type,
     billingCity: row.billing_city,
+    billingAddress: row.billing_address,
+    shippingAddress: row.shipping_address,
     includesCard: Boolean(row.includes_card),
     cardMessage: row.card_message,
     receiverName: row.receiver_name,
@@ -125,7 +126,7 @@ async function listAll(filters = {}) {
     `
       SELECT o.id, o.code, o.user_id, o.shipping_method_id, o.shipping_name, o.shipping_price,
              o.includes_shipping_price, o.customer_name, o.customer_email, o.customer_phone,
-             o.billing_document, o.billing_document_type, o.billing_city, o.shipping_address, o.includes_card, o.card_message,
+             o.billing_document, o.billing_document_type, o.billing_city, o.billing_address, o.shipping_address, o.includes_card, o.card_message,
              o.receiver_name, o.receiver_phone, o.card_signature, o.delivery_date,
              o.subtotal, o.tax_total, o.total, o.status, o.is_paid, o.is_active,
              o.payment_provider, o.payment_reference,
@@ -151,7 +152,7 @@ async function findById(id, connection, options = {}) {
     `
       SELECT id, code, user_id, shipping_method_id, shipping_name, shipping_price,
              includes_shipping_price, customer_name, customer_email, customer_phone,
-             billing_document, billing_document_type, billing_city, shipping_address, includes_card, card_message,
+             billing_document, billing_document_type, billing_city, billing_address, shipping_address, includes_card, card_message,
              receiver_name, receiver_phone, card_signature, delivery_date,
              subtotal, tax_total, total, status, is_paid, is_active,
              payment_provider, payment_reference,
@@ -196,6 +197,7 @@ async function create(orderData, connection) {
         billing_document,
         billing_document_type,
         billing_city,
+        billing_address,
         shipping_address,
         includes_card,
         card_message,
@@ -211,7 +213,7 @@ async function create(orderData, connection) {
         payment_provider,
         payment_reference
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       orderData.code,
@@ -226,6 +228,7 @@ async function create(orderData, connection) {
       orderData.billingDocument,
       orderData.billingDocumentType ?? null,
       orderData.billingCity,
+      orderData.billingAddress ?? null,
       orderData.shippingAddress,
       orderData.includesCard,
       orderData.cardMessage,
@@ -304,6 +307,11 @@ async function update(id, updates, connection) {
   if (updates.billingCity !== undefined) {
     fields.push('billing_city = ?');
     values.push(updates.billingCity);
+  }
+
+  if (updates.billingAddress !== undefined) {
+    fields.push('billing_address = ?');
+    values.push(updates.billingAddress);
   }
 
   if (updates.shippingAddress !== undefined) {

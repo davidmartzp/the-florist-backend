@@ -770,6 +770,21 @@ PREPARE stmt FROM @orders_billing_city_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+SET @orders_billing_address_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'orders'
+    AND COLUMN_NAME = 'billing_address'
+);
+SET @orders_billing_address_sql := IF(
+  @orders_billing_address_exists = 0,
+  'ALTER TABLE orders ADD COLUMN billing_address VARCHAR(255) NULL AFTER billing_city',
+  'SELECT 1'
+);
+PREPARE stmt FROM @orders_billing_address_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 SET @orders_receiver_name_exists := (
   SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE()

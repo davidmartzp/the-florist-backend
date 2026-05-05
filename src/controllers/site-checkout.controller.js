@@ -23,16 +23,21 @@ async function confirmCheckout(req, res) {
 }
 
 async function receiveWebhook(req, res) {
-  // Responder inmediatamente a MercadoPago (IPN requiere respuesta 200 rápida)
   res.status(200).send('OK');
 
-  // Procesar en background después de responder
+  // Soporta formato webhook (JSON body) e IPN (query params: topic=payment&id=...)
+  const payload = { ...req.query, ...req.body };
+
+  // eslint-disable-next-line no-console
+  console.log('[Webhook] received body=%j query=%j', req.body, req.query);
+
   try {
-    await siteCheckoutService.processWebhook(req.body);
-  } catch (error) {
-    // Loggear error pero no afectar la respuesta HTTP
+    const result = await siteCheckoutService.processWebhook(payload);
     // eslint-disable-next-line no-console
-    console.error('Webhook processing error:', error.message);
+    console.log('[Webhook] result=%j', result);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[Webhook] error: %s\n%s', error.message, error.stack);
   }
 }
 

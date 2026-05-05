@@ -138,7 +138,8 @@ async function createCheckoutPreference(payload) {
   const billingDocument = normalizeString(payload.billingDocument, 'billingDocument', { required: true, maxLength: 50 });
   const billingDocumentType = normalizeBillingDocumentType(payload.billingDocumentType);
   const billingCity = normalizeString(payload.billingCity, 'billingCity', { required: true, maxLength: 100 });
-  const shippingAddress = normalizeString(payload.deliveryAddress, 'deliveryAddress', { required: true, maxLength: 255 });
+  const billingAddress = normalizeString(payload.billingAddress, 'billingAddress', { maxLength: 255 });
+  const shippingAddress = normalizeString(payload.deliveryAddress, 'deliveryAddress', { maxLength: 255 });
   const cardMessage = normalizeString(payload.cardMessage, 'cardMessage', { maxLength: 500 });
   const receiverName = normalizeString(payload.receiverName, 'receiverName', { required: true, maxLength: 150 });
   const receiverPhone = normalizeString(payload.receiverPhone, 'receiverPhone', { required: true, maxLength: 50 });
@@ -230,6 +231,7 @@ async function createCheckoutPreference(payload) {
       billingDocument,
       billingDocumentType,
       billingCity,
+      billingAddress,
       deliveryAddress: shippingAddress,
       cardMessage,
       shippingMethodId,
@@ -304,6 +306,7 @@ async function confirmCheckoutPayment(payload) {
       billingDocument: session.payload.billingDocument,
       billingDocumentType: session.payload.billingDocumentType,
       billingCity: session.payload.billingCity,
+      billingAddress: session.payload.billingAddress,
       shippingAddress: session.payload.deliveryAddress,
       includesCard: !!session.payload.cardMessage,
       cardMessage: session.payload.cardMessage,
@@ -447,6 +450,7 @@ async function processWebhook(payload) {
       billingDocument: session.payload.billingDocument,
       billingDocumentType: session.payload.billingDocumentType,
       billingCity: session.payload.billingCity,
+      billingAddress: session.payload.billingAddress,
       shippingAddress: session.payload.deliveryAddress,
       includesCard: !!session.payload.cardMessage,
       cardMessage: session.payload.cardMessage,
