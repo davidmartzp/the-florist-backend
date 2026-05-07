@@ -107,6 +107,26 @@ async function listAll(filters = {}) {
     whereClauses.push('o.is_active = 1');
   }
 
+  if (filters.deliveryDateFrom) {
+    whereClauses.push('o.delivery_date >= ?');
+    values.push(filters.deliveryDateFrom);
+  }
+
+  if (filters.deliveryDateTo) {
+    whereClauses.push('o.delivery_date <= ?');
+    values.push(filters.deliveryDateTo);
+  }
+
+  if (filters.orderDateFrom) {
+    whereClauses.push('DATE(o.created_at) >= ?');
+    values.push(filters.orderDateFrom);
+  }
+
+  if (filters.orderDateTo) {
+    whereClauses.push('DATE(o.created_at) <= ?');
+    values.push(filters.orderDateTo);
+  }
+
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
   const orderByColumn = sortColumns[filters.sortBy] || 'o.created_at';
   const orderByDirection = filters.sortOrder === 'asc' ? 'ASC' : 'DESC';

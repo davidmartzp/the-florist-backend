@@ -570,6 +570,10 @@ async function listOrders(query = {}) {
     shippingMethodId: query.shippingMethodId !== undefined
       ? normalizePositiveInteger(query.shippingMethodId, 'shippingMethodId')
       : undefined,
+    deliveryDateFrom: query.deliveryDateFrom ? String(query.deliveryDateFrom).slice(0, 10) : undefined,
+    deliveryDateTo: query.deliveryDateTo ? String(query.deliveryDateTo).slice(0, 10) : undefined,
+    orderDateFrom: query.orderDateFrom ? String(query.orderDateFrom).slice(0, 10) : undefined,
+    orderDateTo: query.orderDateTo ? String(query.orderDateTo).slice(0, 10) : undefined,
   };
   const { items, total } = await Order.listAll(filters);
   const orders = await hydrateOrders(items);
@@ -845,6 +849,10 @@ async function exportOrders(query = {}) {
     isPaid: query.isPaid === 'true' ? true : query.isPaid === 'false' ? false : undefined,
     sortBy: query.sortBy,
     sortOrder: query.sortOrder,
+    deliveryDateFrom: query.deliveryDateFrom ? String(query.deliveryDateFrom).slice(0, 10) : undefined,
+    deliveryDateTo: query.deliveryDateTo ? String(query.deliveryDateTo).slice(0, 10) : undefined,
+    orderDateFrom: query.orderDateFrom ? String(query.orderDateFrom).slice(0, 10) : undefined,
+    orderDateTo: query.orderDateTo ? String(query.orderDateTo).slice(0, 10) : undefined,
   };
   const { items } = await Order.listAll(filters);
   return hydrateOrders(items);
