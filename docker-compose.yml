@@ -1,0 +1,49 @@
+services:
+
+  # ── API PHP / Apache ────────────────────────────────────────────────────────
+  api:
+    build: .
+    container_name: florist-api
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    volumes:
+      - .:/var/www/html
+    entrypoint: >
+      sh -c "
+        [ ! -d vendor ] && composer install --no-interaction --prefer-dist;
+        apache2-foreground
+      "
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - florist-net
+
+  # ── MySQL ────────────────────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: florist-db
+    restart: unless-stopped
+    ports:
+      - "3030:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ABC12345678abc
+      MYSQL_DATABASE: the_florist
+    volumes:
+      - florist-db-data:/var/lib/mysql
+      - ./db/dump.sql:/docker-entrypoint-initdb.d/dump.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pABC12345678abc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - florist-net
+
+networks:
+  florist-net:
+    driver: bridge
+
+volumes:
+  florist-db-data:
