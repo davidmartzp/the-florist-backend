@@ -1,0 +1,23 @@
+name: Deploy Backend a cPanel
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Subir Backend a cPanel
+        uses: burnett01/rsync-deployments@7.0.2
+        with:
+          switches: -avzr --delete --exclude='.git*' --exclude='.env'
+          path: ./
+          remote_path: /home/tvey5zvgkzx7/public_html/Backend/
+          remote_host: ${{ secrets.CPANEL_HOST }}
+          remote_user: ${{ secrets.CPANEL_USER }}
+          remote_port: ${{ secrets.CPANEL_PORT }}
+          remote_key: ${{ secrets.CPANEL_SSH_KEY }}
