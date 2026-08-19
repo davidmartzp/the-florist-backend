@@ -8,6 +8,14 @@ use Slim\Factory\AppFactory;
 
 $app = AppFactory::create();
 
+// Base path dinámico: en local (Docker) el docroot ya es public/, así que no
+// hay prefijo que recortar; en cPanel el docroot es public_html/ y el script
+// real es .../Backend/public/index.php, así que hay que recortar "/Backend"
+// para que las rutas registradas como /api/... sigan matcheando.
+$scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+$basePath  = rtrim(str_replace('/public', '', $scriptDir), '/');
+$app->setBasePath($basePath);
+
 // ── Middleware (orden de registro = orden inverso de ejecución) ──────────────
 
 // 1) Parser de body JSON / form (capa más interna)
