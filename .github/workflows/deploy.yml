@@ -11,10 +11,27 @@ jobs:
       - name: Checkout del código
         uses: actions/checkout@v4
 
+      - name: Configurar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Instalar dependencias de Composer
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
       - name: Subir Backend a cPanel
         uses: burnett01/rsync-deployments@7.0.2
         with:
-          switches: -avzr --delete --exclude='.git*' --exclude='.env'
+          switches: >-
+            -avzr --delete
+            --exclude='.git*'
+            --exclude='.env'
+            --exclude='db/'
+            --exclude='scripts/'
+            --exclude='Dockerfile'
+            --exclude='docker-compose.yml'
+            --exclude='docker/'
+            --exclude='nginx.conf.example'
           path: ./
           remote_path: /home/tvey5zvgkzx7/public_html/Backend/
           remote_host: ${{ secrets.CPANEL_HOST }}

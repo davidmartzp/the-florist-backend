@@ -1,0 +1,7 @@
+# Front controller para despliegue en subcarpeta (cPanel: public_html/Backend/).
+# Reenvía cualquier request hacia public/, donde vive el punto de entrada real
+# de Slim (public/index.php) y su propio .htaccess de reescritura.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
