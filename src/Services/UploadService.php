@@ -20,6 +20,16 @@ class UploadService
 
     public function storeProductImage(UploadedFileInterface $file): string
     {
+        return $this->store($file, self::PRODUCTS_SUBDIR);
+    }
+
+    public function deleteProductImageIfLocal(?string $imageUrl): void
+    {
+        $this->deleteIfLocal($imageUrl, self::PRODUCTS_SUBDIR);
+    }
+
+    public function store(UploadedFileInterface $file, string $subdir): string
+    {
         if ($file->getError() !== UPLOAD_ERR_OK) {
             throw new HttpError(422, 'Image upload failed');
         }
@@ -37,7 +47,7 @@ class UploadService
 
         $extension = self::ALLOWED_MIME_TYPES[$mimeType];
         $filename  = bin2hex(random_bytes(16)) . '.' . $extension;
-        $dir       = $this->productsDir();
+        $dir       = $this->dir($subdir);
 
         if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
             throw new HttpError(500, 'Could not create upload directory');
@@ -45,16 +55,16 @@ class UploadService
 
         $file->moveTo($dir . '/' . $filename);
 
-        return $this->appUrl() . '/' . self::PRODUCTS_SUBDIR . '/' . $filename;
+        return $this->appUrl() . '/' . $subdir . '/' . $filename;
     }
 
-    public function deleteProductImageIfLocal(?string $imageUrl): void
+    public function deleteIfLocal(?string $imageUrl, string $subdir): void
     {
         if ($imageUrl === null || $imageUrl === '') {
             return;
         }
 
-        $prefix = $this->appUrl() . '/' . self::PRODUCTS_SUBDIR . '/';
+        $prefix = $this->appUrl() . '/' . $subdir . '/';
         if (!str_starts_with($imageUrl, $prefix)) {
             return;
         }
@@ -64,15 +74,15 @@ class UploadService
             return;
         }
 
-        $path = $this->productsDir() . '/' . $filename;
+        $path = $this->dir($subdir) . '/' . $filename;
         if (is_file($path)) {
             @unlink($path);
         }
     }
 
-    private function productsDir(): string
+    private function dir(string $subdir): string
     {
-        return __DIR__ . '/../../public/' . self::PRODUCTS_SUBDIR;
+        return __DIR__ . '/../../public/' . $subdir;
     }
 
     private function appUrl(): string

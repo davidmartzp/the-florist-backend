@@ -21,6 +21,7 @@ declare(strict_types=1);
  */
 
 use App\Controllers\AuthController;
+use App\Controllers\BannerController;
 use App\Controllers\CartController;
 use App\Controllers\OrderController;
 use App\Controllers\Site\SiteCheckoutController;
@@ -157,6 +158,33 @@ $app->group('/api', function (RouteCollectorProxy $api) {
     ->add(new RequirePermissionsMiddleware('PRODUCTS'))
     ->add(new AuthMiddleware());
 
+    // ── Banners (ADMIN) ──────────────────────────────────────────────────────
+    $api->group('/banners', function (RouteCollectorProxy $g) {
+        $g->get('', function ($req, $res) {
+            return (new BannerController())->list($req, $res);
+        });
+        $g->get('/{bannerId}', function ($req, $res, $args) {
+            return (new BannerController())->get($req, $res, $args);
+        });
+        $g->post('', function ($req, $res) {
+            return (new BannerController())->create($req, $res);
+        });
+        $g->patch('/{bannerId}', function ($req, $res, $args) {
+            return (new BannerController())->update($req, $res, $args);
+        });
+        $g->post('/{bannerId}/desktop-image', function ($req, $res, $args) {
+            return (new BannerController())->uploadDesktopImage($req, $res, $args);
+        });
+        $g->post('/{bannerId}/mobile-image', function ($req, $res, $args) {
+            return (new BannerController())->uploadMobileImage($req, $res, $args);
+        });
+        $g->patch('/{bannerId}/toggle-active', function ($req, $res, $args) {
+            return (new BannerController())->toggleActive($req, $res, $args);
+        });
+    })
+    ->add(new RequirePermissionsMiddleware('ADMIN'))
+    ->add(new AuthMiddleware());
+
     // ── Orders (ORDERS) ──────────────────────────────────────────────────────
     $api->group('/orders', function (RouteCollectorProxy $g) {
         // export ANTES de /{orderId} para evitar conflicto de rutas
@@ -205,6 +233,9 @@ $app->group('/api', function (RouteCollectorProxy $api) {
 
     // ── Site (público) ────────────────────────────────────────────────────────
     $api->group('/site', function (RouteCollectorProxy $site) {
+        $site->get('/banners', function ($req, $res) {
+            return (new BannerController())->listSite($req, $res);
+        });
         $site->get('/categories', function ($req, $res) {
             return (new CategoryController())->listSite($req, $res);
         });

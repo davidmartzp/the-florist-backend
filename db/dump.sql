@@ -16,6 +16,35 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `banners`
+--
+
+DROP TABLE IF EXISTS `banners`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `banners` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `title` varchar(150) NOT NULL,
+  `desktop_image` varchar(500) DEFAULT NULL,
+  `mobile_image` varchar(500) DEFAULT NULL,
+  `sort_order` int NOT NULL DEFAULT '0',
+  `is_active` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `banners`
+--
+
+LOCK TABLES `banners` WRITE;
+/*!40000 ALTER TABLE `banners` DISABLE KEYS */;
+/*!40000 ALTER TABLE `banners` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `catalogs`
 --
 
@@ -231,7 +260,7 @@ CREATE TABLE `permissions` (
 
 LOCK TABLES `permissions` WRITE;
 /*!40000 ALTER TABLE `permissions` DISABLE KEYS */;
-INSERT INTO `permissions` VALUES (1,'USERS','Users','Access to the internal users CRUD module','2026-05-01 07:19:04','2026-05-01 07:19:04'),(2,'ORDERS','Orders','Access to the internal orders CRUD module','2026-05-01 07:19:04','2026-05-01 07:19:04'),(3,'PRODUCTS','Products','Access to the internal products CRUD module','2026-05-01 07:19:04','2026-05-01 07:19:04');
+INSERT INTO `permissions` VALUES (1,'USERS','Users','Access to the internal users CRUD module','2026-05-01 07:19:04','2026-05-01 07:19:04'),(2,'ORDERS','Orders','Access to the internal orders CRUD module','2026-05-01 07:19:04','2026-05-01 07:19:04'),(3,'PRODUCTS','Products','Access to the internal products CRUD module','2026-05-01 07:19:04','2026-05-01 07:19:04'),(4,'ADMIN','Admin','Access to global/site-configuration CMS modules (e.g. banners)','2026-05-01 07:19:04','2026-05-01 07:19:04');
 /*!40000 ALTER TABLE `permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 

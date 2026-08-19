@@ -209,10 +209,23 @@ CREATE TABLE IF NOT EXISTS order_items (
   CONSTRAINT order_items_product_id_fk FOREIGN KEY (product_id) REFERENCES products (id)
 );
 
+CREATE TABLE IF NOT EXISTS banners (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  title VARCHAR(150) NOT NULL,
+  desktop_image VARCHAR(500) NULL,
+  mobile_image VARCHAR(500) NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
+
 INSERT IGNORE INTO permissions (code, name, description) VALUES
   ('USERS', 'Users', 'Access to the internal users CRUD module'),
   ('ORDERS', 'Orders', 'Access to the internal orders CRUD module'),
-  ('PRODUCTS', 'Products', 'Access to the internal products CRUD module');
+  ('PRODUCTS', 'Products', 'Access to the internal products CRUD module'),
+  ('ADMIN', 'Admin', 'Access to global/site-configuration CMS modules (e.g. banners)');
 
 SET @products_has_vat_exists := (
   SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
