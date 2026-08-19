@@ -87,6 +87,7 @@ class UploadService
 
     private function appUrl(): string
     {
-        return rtrim((string) ($_ENV['APP_URL'] ?? 'http://localhost'), '/');
+        $backendUrl = $_ENV['BACKEND_PUBLIC_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost';
+        return rtrim((string) $backendUrl, '/');
     }
 }
