@@ -9,6 +9,7 @@ use App\Utils\Fmt;
 use App\Utils\HttpError;
 use App\Utils\ListQuery;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use Psr\Http\Message\UploadedFileInterface;
 
 class ProductService
 {
@@ -229,6 +230,23 @@ class ProductService
                 $this->replaceRelation('product_catalogs', 'catalog_id', $productId, $catalogIds);
             }
         });
+
+        return $this->getProductById($productId);
+    }
+
+    public function uploadProductImage(int $productId, UploadedFileInterface $file): array
+    {
+        $current = Product::find($productId);
+        if ($current === null) {
+            throw new HttpError(404, 'Product not found');
+        }
+
+        $uploadService = new UploadService();
+        $url            = $uploadService->storeProductImage($file);
+        $previousImage  = $current->image;
+
+        $current->update(['image' => $url]);
+        $uploadService->deleteProductImageIfLocal($previousImage);
 
         return $this->getProductById($productId);
     }

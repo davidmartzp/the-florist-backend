@@ -69,6 +69,9 @@ $app->group('/api', function (RouteCollectorProxy $api) {
         $g->patch('/{productId}', function ($req, $res, $args) {
             return (new ProductController())->update($req, $res, $args);
         });
+        $g->post('/{productId}/image', function ($req, $res, $args) {
+            return (new ProductController())->uploadImage($req, $res, $args);
+        });
         $g->patch('/{productId}/toggle-active', function ($req, $res, $args) {
             return (new ProductController())->toggleActive($req, $res, $args);
         });

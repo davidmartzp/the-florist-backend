@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Services\ProductService;
+use App\Utils\HttpError;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\UploadedFileInterface;
 
 class ProductController extends BaseController
 {
@@ -53,6 +55,20 @@ class ProductController extends BaseController
         array                  $args
     ): ResponseInterface {
         return $this->json($response, $this->service->updateProduct((int) $args['productId'], $this->body($request->getParsedBody())));
+    }
+
+    /** POST /api/products/{productId}/image */
+    public function uploadImage(
+        ServerRequestInterface $request,
+        ResponseInterface      $response,
+        array                  $args
+    ): ResponseInterface {
+        $file = $request->getUploadedFiles()['image'] ?? null;
+        if (!$file instanceof UploadedFileInterface) {
+            throw new HttpError(422, 'image file is required');
+        }
+
+        return $this->json($response, $this->service->uploadProductImage((int) $args['productId'], $file));
     }
 
     /** PATCH /api/products/{productId}/toggle-active */

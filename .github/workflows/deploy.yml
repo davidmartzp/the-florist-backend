@@ -32,6 +32,7 @@ jobs:
             --exclude='docker-compose.yml'
             --exclude='docker/'
             --exclude='nginx.conf.example'
+            --exclude='public/uploads/'
           path: ./
           remote_path: /home/tvey5zvgkzx7/public_html/Backend/
           remote_host: ${{ secrets.CPANEL_HOST }}
