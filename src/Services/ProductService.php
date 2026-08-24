@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductPriceHistory;
 use App\Utils\Fmt;
 use App\Utils\HttpError;
+use App\Utils\ImageUrl;
 use App\Utils\ListQuery;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Psr\Http\Message\UploadedFileInterface;
@@ -423,7 +424,7 @@ class ProductService
             'vatRate'     => (float) $row->vat_rate,
             'stock'       => (int) $row->stock,
             'description' => $row->description,
-            'image'       => $row->image,
+            'image'       => ImageUrl::resolve($row->image),
             'type'        => $row->type ?? 'GENERAL',
             'isActive'    => (bool) $row->is_active,
             'createdAt'   => Fmt::ts($row->created_at),
@@ -441,7 +442,7 @@ class ProductService
             'vatRate'     => (float) $p->vat_rate,
             'stock'       => (int) $p->stock,
             'description' => $p->description,
-            'image'       => $p->image,
+            'image'       => ImageUrl::resolve($p->image),
             'type'        => $p->type ?? 'GENERAL',
             'isActive'    => (bool) $p->is_active,
             'createdAt'   => Fmt::ts($p->created_at),

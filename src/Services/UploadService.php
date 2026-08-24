@@ -55,7 +55,7 @@ class UploadService
 
         $file->moveTo($dir . '/' . $filename);
 
-        return $this->appUrl() . '/' . $subdir . '/' . $filename;
+        return $subdir . '/' . $filename;
     }
 
     public function deleteIfLocal(?string $imageUrl, string $subdir): void
@@ -64,12 +64,17 @@ class UploadService
             return;
         }
 
-        $prefix = $this->appUrl() . '/' . $subdir . '/';
-        if (!str_starts_with($imageUrl, $prefix)) {
+        $absolutePrefix = $this->appUrl() . '/' . $subdir . '/';
+        $relativePrefix = $subdir . '/';
+
+        if (str_starts_with($imageUrl, $absolutePrefix)) {
+            $filename = basename($imageUrl);
+        } elseif (str_starts_with($imageUrl, $relativePrefix)) {
+            $filename = basename($imageUrl);
+        } else {
             return;
         }
 
-        $filename = basename($imageUrl);
         if ($filename === '' || str_contains($filename, '/') || str_contains($filename, '..')) {
             return;
         }

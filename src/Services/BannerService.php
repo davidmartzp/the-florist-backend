@@ -5,6 +5,7 @@ namespace App\Services;
 
 use App\Models\Banner;
 use App\Utils\HttpError;
+use App\Utils\ImageUrl;
 use App\Utils\ListQuery;
 use Psr\Http\Message\UploadedFileInterface;
 
@@ -36,7 +37,7 @@ class BannerService
             ->offset($pagination['offset'])
             ->limit($pagination['pageSize'])
             ->get()
-            ->map(fn($b) => $b->toApiArray())
+            ->map(fn($b) => $this->present($b))
             ->all();
 
         return ListQuery::buildResponse($items, $total, $pagination);
@@ -44,7 +45,7 @@ class BannerService
 
     public function getBannerById(int $bannerId): array
     {
-        return $this->findOrFail($bannerId)->toApiArray();
+        return $this->present($this->findOrFail($bannerId));
     }
 
     public function createBanner(array $payload): array
@@ -58,7 +59,7 @@ class BannerService
             'is_active'  => false,
         ]);
 
-        return $banner->fresh()->toApiArray();
+        return $this->present($banner->fresh());
     }
 
     public function updateBanner(int $bannerId, array $payload): array
@@ -80,7 +81,7 @@ class BannerService
 
         $current->update($updates);
 
-        return $current->fresh()->toApiArray();
+        return $this->present($current->fresh());
     }
 
     public function toggleBannerActive(int $bannerId): array
@@ -113,13 +114,21 @@ class BannerService
             ->map(fn(Banner $b) => [
                 'id'           => $b->id,
                 'title'        => $b->title,
-                'desktopImage' => $b->desktop_image,
-                'mobileImage'  => $b->mobile_image,
+                'desktopImage' => ImageUrl::resolve($b->desktop_image),
+                'mobileImage'  => ImageUrl::resolve($b->mobile_image),
             ])
             ->all();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function present(Banner $banner): array
+    {
+        $api                 = $banner->toApiArray();
+        $api['desktopImage'] = ImageUrl::resolve($api['desktopImage']);
+        $api['mobileImage']  = ImageUrl::resolve($api['mobileImage']);
+        return $api;
+    }
 
     private function uploadImage(int $bannerId, UploadedFileInterface $file, string $column): array
     {
@@ -131,7 +140,7 @@ class BannerService
         $current->update([$column => $url]);
         $uploadService->deleteIfLocal($previousImage, self::BANNERS_SUBDIR);
 
-        return $current->fresh()->toApiArray();
+        return $this->present($current->fresh());
     }
 
     private function findOrFail(int $id): Banner
